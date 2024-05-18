@@ -1,0 +1,4 @@
+dist/
+maticalgos_spark.egg-info/
+/setup.py
+/MANIFEST.in
