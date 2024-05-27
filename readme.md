@@ -120,17 +120,17 @@ from maticalgos.sparkLib import SparkLib, OrderSocket
 
 2. **Create a Spark object**
 ```python
-spark_object = SparkLib(userid = "Your Emailid", 
+spark = SparkLib(userid = "Your Emailid", 
                          password = "Your Password")
 
 # OR
 
-spark_object = SparkLib(apikeys = "Your API Keys")
+spark = SparkLib(apikeys = "Your API Keys")
 ```
 
 3. **Generate a access token**
 ```python
-spark_object.generate_token()
+spark.generate_token()
 ```
 
 ## API Methods
@@ -149,11 +149,12 @@ spark_object.generate_token()
 5. [Linked Strategies](#linked-strategies)
    1. [Link Account to Strategy](#link-account-to-strategy)
    2. [Get Linked Strategies](#get-linked-strategies)
-   3. [Modify Linked Strategy](#modify-linked-strategy)
+   3. [Get Linked Strategies By Account](#get-linked-strategies-by-account)
+   4. [Modify Linked Strategy](#modify-linked-strategy)
       1. Modify Linked Strategy
       2. Activate Linked Strategy
       3. Deactivate Linked Strategy
-   4. [Delete Linked Strategy](#delete-linked-strategy)
+   5. [Delete Linked Strategy](#delete-linked-strategy)
 
 6. [Expiry Dates](#get-expiry-dates)
 7. [Tokens](#get-tokens)
@@ -164,11 +165,19 @@ spark_object.generate_token()
    3. [Cancel order](#cancel-an-order)
    4. [Square off All Orders](#square-off)
    5. [Cancel All Orders](#cancel-all-orders)
+   6. [Stop Operation](#stop-operation)
+   7. [Square Off Single](#square-off-single)
+   8. [Delete Trade](#delete-order)
+   9. [Manual Square Off](#manual-square-off)
 
 10. [Orderbook](#orderbook)
 11. [Tradebook](#get-tradebook)
 12. [Netposition](#netposition)
 13. [Execution Logs](#get-excution-logs)
+14. [Holiday List](#get-holiday-list)
+15. [Freeze Quantity](#freeze-quantity)
+16. [Reconnect Order Websocket](#reconnect-order-websocket)
+17. [Contract Master File](#contract-master-file)
 
 ### Profile
 
@@ -176,7 +185,7 @@ This method is used to get the profile of the user.
 
 Code
 ```python
-print(spark_object.profile()) # get profile
+print(spark.profile()) # get profile
 ```
 Sample response
 ```
@@ -192,7 +201,7 @@ of all accounts and one account.
 
 #### All Accounts
 ```python
-print(spark_object.getAllAccounts())
+print(spark.getAllAccounts())
 ```
 Sample response
 
@@ -203,7 +212,7 @@ Sample response
 #### One Account
 We have to pass the account name to get the account information.
 ```python
-print(spark_object.getOneAccount(accountName='Your Account Name'))
+print(spark.getOneAccount(accountName='Your Account Name'))
 ```
 Sample response
 ```
@@ -307,11 +316,12 @@ Sample response
 ## Linked Strategies
 1. [Link Account to Strategy](#link-account-to-strategy)
 2. [Get Linked Strategies](#get-linked-strategies)
-3. [Modify Linked Strategy](#modify-linked-strategy)
+3. [Get Linked Strategies By Account](#get-linked-strategies-by-account)
+4. [Modify Linked Strategy](#modify-linked-strategy)
    1. Modify Linked Strategy
    2. Activate Linked Strategy
    3. Deactivate Linked Strategy
-4. [Delete Linked Strategy](#delete-linked-strategy)
+5. [Delete Linked Strategy](#delete-linked-strategy)
 
 
 ### Link Account to Strategy
@@ -331,6 +341,16 @@ Sample response
 ### Get Linked Strategies
 ```python
 print(spark.getLinkedStrategy())
+```
+
+Sample response
+```
+{'status': True, 'error': False, 'data': [{'StrategyName': 'Your Strategy Name', 'AccountName': 'Your Account Name', 'UCC': 'Your UCC', 'Multiplier': 1, 'Activate': 1, 'Capital': 0.0}], 'message': 'Data Received'}
+```
+
+### Get Linked Strategies By Account
+```python
+print(spark.spark.getlinkStrategyAccount(accountName='Your Account Name'))
 ```
 
 Sample response
@@ -437,9 +457,13 @@ Sample response
 3. [Cancel order](#cancel-an-order)
 4. [Square off All Orders](#square-off)
 5. [Cancel All Orders](#cancel-all-orders)
-6. [Orderbook](#orderbook)
-7. [Tradebook](#get-tradebook)
-8. [Netposition](#netposition)
+6. [Stop Operation](#stop-operation)
+7. [Square Off Single](#square-off-single)
+8. [Delete Trade](#delete-order)
+9. [Manual Square Off](#manual-square-off)
+10. [Orderbook](#orderbook)
+11. [Tradebook](#get-tradebook)
+12. [Netposition](#netposition)
 
 ### LTP
 Get the last traded price of the token.
@@ -457,7 +481,7 @@ You can place following types of order through this API.
 Code
 ```python
 # Limit Order
-print(spark_object.place_order(strategyName = "Your Strategy Name",
+print(spark.place_order(strategyName = "Your Strategy Name",
                                 transType = "Buy",
                                 token = "NSE:212", 
                                 qty = 1,
@@ -465,14 +489,14 @@ print(spark_object.place_order(strategyName = "Your Strategy Name",
                                 productType = "Intraday",
                                 limitPrice = 500.0))
 # Market Order
-print(spark_object.place_order(strategyName = "Your Strategy Name",
+print(spark.place_order(strategyName = "Your Strategy Name",
                                transType = "Sell",
                                token = "NSE:212",
                                qty = 1,
                                orderType = "Market",
                                productType = "Intraday"))
 # SL-Limit Order
-print(spark_object.place_order(strategyName = "Your Strategy Name",
+print(spark.place_order(strategyName = "Your Strategy Name",
                                transType = "Buy",
                                token = "NSE:212",
                                qty = 1,
@@ -500,7 +524,7 @@ Sample reponse of place order
 
 #### Modify Order
 ```python
-print(spark_object.modify_order(strategyName='Your Strategy Name',
+print(spark.modify_order(strategyName='Your Strategy Name',
                                 strefID=2328,
                                 orderType='SL-Limit',
                                 limitPrice=190))
@@ -512,7 +536,7 @@ Sample response of modify order
 
 #### Cancel order
 ```python
-print(spark_object.cancel_order(strategyName='Your Strategy Name',strefID=2328))
+print(spark.cancel_order(strategyName='Your Strategy Name',strefID=2328))
 ```
 Sample response of cancel order
 ```
@@ -547,14 +571,56 @@ response
 {'status': True, 'error': False, 'data': [], 'message': 'Request sent to Cancel All Orders in AccountNamme : Your Account Name'}
 ```
 
+### Stop Operation
+
+```python
+print(spark.stopOperation(strategyName='Your Strategy Name', strefID='Your order Reference ID'))
+```
+
+Sample response
+```
+{'status': True, 'error': False, 'data': [{'strefID':Your order Reference ID }], 'message': 'Operations stopped on {Your order Reference ID}'}
+```
+
+### Square Off Single
+```python
+print(spark.squareOffSingle(accountName='You Account Name', strategyName='Your Strategy Name', token='NSE:13528', positionType='Intraday', at_limit='true'))
+```
+
+Sample response
+```
+{"status":true,"error":false,"data":[{"strefID":308}],"message":"Order Placed, Position Squared off"}
+```
+
+### Delete Trade
+```python
+print(spark.deleteTrade(TDno='Your Trade Number'))
+```
+
+Sample response
+```
+{"status":true,"error":false,"data":[],"message":"Trade Deleted"}
+```
+
+### Manual Square Off
+```python
+print(spark.manualSquareOff(accountName='Your Account Name', strategyName='Your Strategy Name', token='NSE:13528', positionType='Intraday', tradedPrice=0, tradedAt=0, ordersPlaced=0, qty=1))
+```
+
+Sample response
+```
+{"status":true,"error":false,"data":[],"message":"Position closed manually."}
+```
+
+
 ### orderbook
 ```python
-print(spark_object.orderbook(accountName='Your Account Name',
+print(spark.orderbook(accountName='Your Account Name',
                              strategyName='Your Strategy Name',
                              strefid=2000, # Optional : order id
                              reftag='Your Reference Tag', # Optional : Reference Tag    
                              withorders='Y')) # Optional : 'Y' to get all orders 
-print(spark_object.orderbook(accountName='Your Account Name',
+print(spark.orderbook(accountName='Your Account Name',
                              strategyName='Your Strategy Name'))
 ```
 
@@ -565,7 +631,7 @@ Sample response
 
 ### Get tradebook
 ```python
-print(spark_object.tradebook(startDate='2024-04-01',
+print(spark.tradebook(startDate='2024-04-01',
                              endDate='2024-04-03',
                              strategyName='Your Strategy Name',
                              accountName='Your Account Name'))
@@ -579,7 +645,7 @@ Sample response
 
 ### Netposition
 ```python
-print(spark_object.netposition(accountName='Your Account Name',
+print(spark.netposition(accountName='Your Account Name',
                                strategyName='Your Strategy Name'))
 ```
 
@@ -597,6 +663,42 @@ Sample response
 ```
 {'status': True, 'error': True, 'data': [{'Datetime': '2024-04-06T09:36:00', 'UCC': 'Your UCC', 'Name': 'Strategy Name', 'Alert Type': 'DEBUG', 'Message': "Endpoint Called : ModifyOrder. Payload Received : {'UCC': 'Your UCC', 'StrategyName': 'Strategy Name', 'strefID': 2327, 'orderType': 'Market', 'limitPrice': 0.0, 'triggerPrice': 0.0, 'identifier': ''}"}], 'message': 'Data Received'}
 ```
+
+### Reconnect Order Websocket
+```python
+print(spark.reconnect_orderWS(accountName='Your Account Name'))
+```
+
+Sample response
+```
+{"status":true,"error":false,"data":[],"message":"Reconnecting to WS"}
+```
+
+### Holiday List
+```python
+print(spark.isHoliday(exch='NFO'))
+```
+
+Sample response
+```
+{'status': True, 'error': False, 'data': ['2024-04-02', '2024-04-06', '2024-04-13', '2024-04-14', '2024-04-19', '2024-04-21', '2024-04-28'], 'message': 'Data Received'}
+```
+
+### Freeze Quantity
+```python
+print(spark.freezeqty(symbol='BANKNIFTY'))
+```
+
+Sample response
+```
+{"status":true,"error":false,"data":[{"freezeQty":900}],"message":"Data Received"}
+```
+
+### Contract Master File
+```python
+print(spark.contractMaster())
+```
+
 
 ## Sample Code
 ```python
@@ -620,6 +722,9 @@ if __name__ == '__main__':
                             orderType='SL-Limit',
                             limitPrice=190))
     print(spark.cancelorder(strategyName='Your Strategy Name',strefID=2328))
+    print(spark.stopOperation(strategyName='Your Strategy Name', strefID='Your order Reference ID'))
+    print(spark.deleteTrade(TDno='Your Trade Number'))
+    print(spark.manualSquareOff(accountName='Your Account Name', strategyName='Your Strategy Name', token='NSE:13528', positionType='Intraday', tradedPrice=0, tradedAt=0, ordersPlaced=0, qty=1))    
 
     print(spark.getExpiry(symbol='NIFTY',exchange='NFO',instrument='OPT'))
     print(spark.getExpiry(symbol='SBIN',exchange='NFO',instrument='FUT'))
@@ -663,7 +768,8 @@ if __name__ == '__main__':
 
     print(spark.SquareOff(ctype='strategy',strategyName='Your Strategy Name',accountName='Your Account Name'))
     print(spark.SquareOff(ctype='account',accountName='Your Account Name'))
-
+    print(spark.squareOffSingle(accountName='You Account Name', strategyName='Your Strategy Name', token='NSE:13528', positionType='Intraday', at_limit='true'))
+    
     print(spark.ltp(Tokens='NSE:212'))
 
     print(spark.intradaypnl(strategyName='Your Strategy Name',accountName='Your Account Name'))
@@ -675,6 +781,15 @@ if __name__ == '__main__':
     print(spark.orderbook(strategyName='Your Strategy Name',accountName='Your Account Name'))
 
     print(spark.excutionLogs())
+
+    print(spark.reconnect_orderWS(accountName='Your Account Name'))
+    
+    print(spark.isHoliday(exch='NFO'))
+    
+    print(spark.freezeqty(symbol='BANKNIFTY'))
+    
+    print(spark.contractMaster())
+
 ```
 
 

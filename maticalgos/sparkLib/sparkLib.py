@@ -23,12 +23,13 @@ class SparkLib():
         "account.one" : "/account/{accountName}",
         "account.activate": "/activate-account/{account}/{yn}",
         "authcode.validate" : "/validate_authcode/{broker}",
+        "authcode.generate" : "/login/{account}",
         "strategy" : "/strategy",
         "strategy.create" : "/strategy",
         "strategy.modify" : "/strategy/{strategyname}",
         "strategy.delete" : "/strategy/{strategyname}",
         "linkstartegy" : "/linkstrategy",
-        "linkstrategyaccount" : "/link-strategy-account",
+        "linkstrategyaccount" : "/link-strategy-account?ac={acname}",
         "modifylinkstrategy" : "/linkstrategy?st={st}&ac={ac}",
         "deleteLinkStrategy" : "/linkstrategy?st={st}&ac={ac}",
         "CancalAll_url" : "/CancelAll/{ctype}?stname={stname}&acname={acname}",
@@ -40,7 +41,15 @@ class SparkLib():
         "overview" : "/overview/",
         "ltp" : "/ltp?Tokens={Tokens}",
         "excutionLogs" : "/ExecutionLogs",
-        "intradaypnl" : "/intradaypnl?acname={acname}&stname={stname}"
+        "intradaypnl" : "/intradaypnl?acname={acname}&stname={stname}",
+        "reconnectOrderWS":"/reconnectWS/?acname={acname}",
+        "stopOperation":"/stopOperation",
+        "squareOffSingle":"/SquareOffSingle?acname={acname}&stname={stname}&token={token}&positionType={positionType}&at_limit={at_limit}",
+        "trade.delete" : "/trade/?TDno={TDno}",
+        "manualSquareOff" : "/manual-squareoff/?acname={acname}&stname={stname}&token={token}&positionType={positionType}",
+        "isHoliday" : "/isHoliday/?exch={exch}",
+        "freezeqty" : "/master-freezeqty?symbol={symbol}",
+        "contractMaster" : "/contract-master/",
     }
     _timeout = 15
 
@@ -50,7 +59,7 @@ class SparkLib():
         self.apikeys = apikeys
         self.reqsession = requests.Session()
         self.header = {}
-        if not access_token :
+        if access_token:
             self.set_AccessToken(access_token)
 
     def set_AccessToken(self, access_token):
@@ -86,7 +95,7 @@ class SparkLib():
             return resp
         else :
             self.set_AccessToken(resp['access_token'])
-            return {"stutus" : True, "error" : False, "data" : [], "message" : "User Authorized"}
+            return {"stutus" : True, "error" : False, "data" : [resp], "message" : "User Authorized"}
 
     def profile(self):
         """
@@ -212,7 +221,6 @@ class SparkLib():
         url = "".join([self.BASEURL, self._routes['master.token'].format(body = st)])
         return self._request("GET", url)
 
-
     def getAllAccounts(self):
         """
         Get all accounts
@@ -229,6 +237,16 @@ class SparkLib():
         """
         url = "".join([self.BASEURL, self._routes['account.one'].format(accountName = accountName)])
         return self._request("GET", url)
+
+    def generateAuthcode(self, accountName):
+        """
+        Generate the auth code
+
+        Args:
+            accountName (str): Name of the account
+        """
+        url = "".join([self.BASEURL, self._routes['authcode.generate'].format(account = accountName)])
+        return self._request("POST", url)
 
     def validateAuthcode(self, broker, authcode):
         """
@@ -361,12 +379,12 @@ class SparkLib():
 
     def getlinkStrategyAccount(self, accountName):
         """
-        Get the link strategy account
+        Get the linked Strategy Per Account
 
         Args:
             accountName (str): Name of the account
         """
-        url = "".join([self.BASEURL, self._routes['linkstrategyaccount']]).format(ac = accountName)
+        url = "".join([self.BASEURL, self._routes['linkstrategyaccount']]).format(acname = accountName)
         return self._request("GET", url)
 
     def CancalAll(self, ctype, accountName ,strategyName = 'undefined'):
@@ -482,6 +500,99 @@ class SparkLib():
         url = "".join([self.BASEURL, self._routes['intradaypnl']]).format(acname = accountName, stname = strategyName)
         return self._request("GET", url)
 
+    def reconnect_orderWS(self,accountName):
+        """
+        Reconnect the order WS
+
+        Args:
+            accountName (str): Name of the account
+        """
+        url = "".join([self.BASEURL, self._routes['reconnectOrderWS']]).format(acname = accountName)
+        return self._request("POST", url)
+
+    def stopOperation(self,strategyName,strefID):
+        """
+        Stop the operation
+
+        Args:
+            strategyName (str): Name of the strategy
+            strefID (str): Reference ID of the order
+        """
+        body = {"strategyname": strategyName, "strefID": strefID}
+        url = "".join([self.BASEURL, self._routes['stopOperation']])
+        return self._request("POST", url, body = body)
+
+    def squareOffSingle(self,accountName,strategyName,token,positionType,at_limit):
+        """
+        Square off the single order
+
+        Args:
+            accountName (str): Name of the account
+            strategyName (str): Name of the strategy
+            token (str): Token of the Symbol
+            positionType (str): Position type of the order
+            at_limit (str): At limit [true, false]
+        """
+        at_limit = at_limit if at_limit in ['true','false'] else '--'
+        url = "".join([self.BASEURL, self._routes['squareOffSingle']]).format(acname = accountName, stname = strategyName, token = token, positionType = positionType, at_limit = at_limit)
+        return self._request("POST", url)
+
+    def manualSquareOff(self,accountName,strategyName,token,positionType,tradedPrice,tradedAt,ordersPlaced,qty):
+        """
+        Manual square off
+
+        Args:
+            accountName (str): Name of the account
+            strategyName (str): Name of the strategy
+            token (str): Token of the Symbol
+            positionType (str): Position type of the order
+            tradedPrice (float): Traded price
+            tradedAt (float): Traded at
+            ordersPlaced (float): Orders placed
+            qty (int): Quantity
+        """
+        body = {"tradedPrice": tradedPrice, "tradedAt": tradedAt, "ordersPlaced": ordersPlaced, "qty": qty}
+        url = "".join([self.BASEURL, self._routes['manualSquareOff']]).format(acname = accountName, stname = strategyName, token = token, positionType = positionType)
+        return self._request("POST", url, body = body)
+
+    def deleteTrade(self,TDno):
+        """
+        Delete the trade
+
+        Args:
+            TDno (str): Trade number
+        """
+        url = "".join([self.BASEURL, self._routes['trade.delete']]).format(TDno = TDno)
+        return self._request("DELETE", url)
+
+    def isHoliday(self,exch):
+        """
+        Get Holiday Dates list
+
+        Args:
+            exch (str): Exchange name
+        """
+        url = "".join([self.BASEURL, self._routes['isHoliday']]).format(exch = exch)
+        return self._request("GET", url)
+
+    def freezeqty(self,symbol):
+        """
+        Get the freeze quantity for the symbol
+
+        Args:
+            symbol (str): Symbol of the instrument
+        """
+        url = "".join([self.BASEURL, self._routes['freezeqty']]).format(symbol = symbol)
+        return self._request("GET", url)
+
+    def contractMaster(self):
+        """
+        Get the File containing all the contracts information
+
+        """
+        url = "".join([self.BASEURL, self._routes['contractMaster']])
+        return self._request("GET", url)
+
     def _request(self, method, url, body = None, data = None, is_header = True, timeout = _timeout):
         """
         Make the request to the server
@@ -508,6 +619,10 @@ class SparkLib():
         except requests.exceptions.Timeout:
             return {"status" : False, "data" : [], "error" : True, "message" : "Timeout error"}
 
+        except requests.exceptions.ConnectionError:
+            return {"status" : False, "data" : [], "error" : True, "message" : "Connection error"}
+
         except Exception as e :
             return {"status" : False, "data" : [], "error" : True, "message" : e}
+
 
