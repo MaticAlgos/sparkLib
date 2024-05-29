@@ -163,6 +163,7 @@ spark.generate_token()
    1. [Place order](#place-an-order)
    2. [Modify order](#modify-order)
    3. [Cancel order](#cancel-an-order)
+   4. [Delete Order](#delete-order)
    4. [Square off All Orders](#square-off)
    5. [Cancel All Orders](#cancel-all-orders)
    6. [Stop Operation](#stop-operation)
@@ -173,6 +174,7 @@ spark.generate_token()
 10. [Orderbook](#orderbook)
 11. [Tradebook](#get-tradebook)
 12. [Netposition](#netposition)
+13. [Push Trades](#push-trades)
 13. [Execution Logs](#get-excution-logs)
 14. [Holiday List](#get-holiday-list)
 15. [Freeze Quantity](#freeze-quantity)
@@ -455,6 +457,7 @@ Sample response
 1. [Place order](#place-an-order)
 2. [Modify order](#modify-order)
 3. [Cancel order](#cancel-an-order)
+4. [Delete Order](#delete-order)
 4. [Square off All Orders](#square-off)
 5. [Cancel All Orders](#cancel-all-orders)
 6. [Stop Operation](#stop-operation)
@@ -464,6 +467,7 @@ Sample response
 10. [Orderbook](#orderbook)
 11. [Tradebook](#get-tradebook)
 12. [Netposition](#netposition)
+13. [Push Trades](#push-trades)
 
 ### LTP
 Get the last traded price of the token.
@@ -541,6 +545,16 @@ print(spark.cancel_order(strategyName='Your Strategy Name',strefID=2328))
 Sample response of cancel order
 ```
 {'status': True, 'error': True, 'data': [{'strefID': 2328}], 'message': 'Order Cancelled.'}
+```
+
+### Delete Order
+```python
+print(spark.deleteOrder(strefID=2328))
+```
+
+Sample response
+```
+{'status': True, 'error': False, 'data': [], 'message': 'Order Deleted.'}
 ```
 
 ### Square off
@@ -653,6 +667,18 @@ Sample response
 ```
 {'status': True, 'error': False, 'data': [{'Your Account Name': {'bookedpnl': 0.816660000000013, 'openpnl': None, 'totalpnl': None, 'totalpositions': 1, 'openpositions': 1}}], 'message': 'Data Received'}
 ```
+
+### Push Trades
+```python
+print(spark.pushtrades())
+```
+
+Sample response
+```
+{'status': True, 'error': False, 'data': [], 'message': 'Orders converted to Trades and pushed to database'}
+```
+
+
 
 ### Get Excution Logs
 ```python
@@ -775,6 +801,8 @@ if __name__ == '__main__':
     print(spark.intradaypnl(strategyName='Your Strategy Name',accountName='Your Account Name'))
 
     print(spark.netposition(strategyName='Your Strategy Name',accountName='Your Account Name'))
+    
+    print(spark.pushtrades())
 
     print(spark.tradebook(startDate='2024-04-01',endDate='2024-04-04',strategyName='Your Strategy Name',accountName='Your Account Name'))
 
