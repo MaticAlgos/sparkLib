@@ -121,7 +121,7 @@ from maticalgos.sparkLib import SparkLib, OrderSocket
 2. **Create a Spark object**
 ```python
 spark = SparkLib(userid = "Your Emailid", 
-                         password = "Your Password")
+                password = "Your Password")
 
 # OR
 
@@ -132,6 +132,13 @@ spark = SparkLib(apikeys = "Your API Keys")
 ```python
 spark.generate_token()
 ```
+
+Sample response
+```
+{"access_token":"eyJhbGcUW_FLiIUf9T4j1bFhRg","token_type":"bearer"}
+```
+
+
 
 ## API Methods
 1. [Profile](#profile)
@@ -234,7 +241,7 @@ print(spark.activateAccount(accountName='Your Account Name',activate='Y'))
 
 Sample response
 ```
-{'status': True, 'error': False, 'data': [], 'message': 'Account Activated.'}
+{'status': True, 'error': False, 'data': [{"Trade": "Y"}], 'message': 'Account Activated.'}
 ```
 
 ### Deactivate Account
@@ -244,7 +251,7 @@ print(spark.deactivateAccount(accountName='Your Account Name',activate='N'))
 
 Sample response
 ```
-{'status': True, 'error': False, 'data': [], 'message': 'Account Deactivated.'}
+{'status': True, 'error': False, 'data': [{"Trade": "N"}], 'message': 'Account Deactivated.'}
 ```
 
 | Input Variables | Possible Values           | Data Type | Description |
@@ -337,7 +344,7 @@ print(spark.addlinkStrategy(strategyName='Your Strategy Name',
 
 Sample response
 ```
-{'status': True, 'error': False, 'data': [], 'message': 'Account Linked to Strategy.'}
+{'status': True, 'error': False, 'data': [], 'message': 'Strategy Added.'}
 ```
 
 ### Get Linked Strategies
@@ -366,23 +373,23 @@ Sample response
 print(spark.modifyLinkedStrategy(strategyName='Your Strategy Name',
                                 accountName='Your Account Name',
                                 Multiplier=1,
-                                Activate='Y',
+                                Activate=1,
                                 Capital=10000))
 
 # Activate Linked Strategy 
-    # Send Activate='Y' to activate the strategy
+    # Send Activate=1 to activate the strategy
 print(spark.modifyLinkedStrategy(strategyName='Your Strategy Name',
                                  accountName='Your Account Name',
                                  Multiplier=1,
-                                 Activate='Y',
+                                 Activate=1,
                                  Capital=10000))
 
 # Deactivate Linked Strategy
-    # Send Activate='N' to deactivate the strategy
+    # Send Activate=0 to deactivate the strategy
 print(spark.modifyLinkedStrategy(strategyName='Your Strategy Name',
                                  accountName='Your Account Name',
                                  Multiplier=1,
-                                 Activate='N',
+                                 Activate=0,
                                  Capital=10000))
 ```
 
@@ -476,7 +483,7 @@ Token format is 'Exchange:Token'
 print(spark.ltp(Tokens='NSE:212'))
 ```
 
-### Place an order
+### Place an Order
 You can place following types of order through this API.
 1. Limit Order
 2. Market Order

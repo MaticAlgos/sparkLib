@@ -17,6 +17,7 @@ class SparkLib():
         "order.place" : "/order",
         "order.cancel" : "/order",
         "order.modify" : "/order",
+        "order.delete" : "/deleteorder/?strefID={strefID}&reftag={reftag}",
         "master.expiry" : "/expiry?symbol={symbol}&exchange={exchange}&instrument={instrument}",
         "master.token" : "/master-tokens?{body}",
         "account.all" : "/account",
@@ -278,7 +279,7 @@ class SparkLib():
         url = "".join([self.BASEURL, self._routes['strategy']])
         return self._request("GET", url)
 
-    def addStrategy(self, strategyName, Description, StrategyType, Display, ForwardTest):
+    def addStrategy(self, strategyName, StrategyType, Description ="", Display='Private', ForwardTest='N'):
         """
         Add the strategy
 
@@ -293,7 +294,7 @@ class SparkLib():
         url = "".join([self.BASEURL, self._routes['strategy.create']])
         return self._request("POST", url, body = body)
 
-    def modifyStrategy(self, strategyName, Description, StrategyType, Display, ForwardTest):
+    def modifyStrategy(self, strategyName,StrategyType, Description ="", Display='Private', ForwardTest='N'):
         """
         Modify the strategy
 
@@ -327,15 +328,14 @@ class SparkLib():
             strategyName (str): Name of the strategy
             accountName (str): Name of the account
             Multiplier (int): Multiplier of the strategy
-            Activate (str): Activate the strategy
+            Activate (int): Activate the strategy
             Capital (int): Capital of the strategy
         """
-        activate = 0 if Activate == 'N' else 1
         body ={
             'StrategyName': strategyName,
             'AccountName': accountName,
             'Multiplier': Multiplier,
-            'Activate': activate,
+            'Activate': Activate,
             'Capital': Capital
         }
 
@@ -350,7 +350,7 @@ class SparkLib():
             strategyName (str): Name of the strategy
             accountName (str): Name of the account
             Multiplier (int): Multiplier of the strategy
-            Activate (str): Activate the strategy
+            Activate (int): Activate the strategy
             Capital (int): Capital of the strategy
         """
         activate = 0 if Activate == 'N' else 1
@@ -420,7 +420,7 @@ class SparkLib():
             strategyName (str): Name of the strategy
             strefid (str): Reference ID of the order
             reftag (str): Reference tag of the order
-            withorders (str): With orders
+            withorders (bool): With orders
         """
         url = "".join([self.BASEURL, self._routes['orderbook'].format(acname = accountName, stname = strategyName)])
         if strefid : url = url + "&strefid=" + strefid
@@ -452,7 +452,7 @@ class SparkLib():
         url = "".join([self.BASEURL, self._routes['netposition']])
         return self._request("GET", url, body = {"acname" : accountName, "stname" : strategyName})
 
-    def pushtrades(self,allusers):
+    def pushtrades(self):
         """
         Push the trades
 
@@ -460,7 +460,7 @@ class SparkLib():
             allusers (str): All users
         """
         url = "".join([self.BASEURL, self._routes['pushtrades']])
-        return self._request("GET", url, body = {"allusers" : allusers})
+        return self._request("GET", url)
 
     def overview(self,accountName):
         """
@@ -516,7 +516,7 @@ class SparkLib():
 
         Args:
             strategyName (str): Name of the strategy
-            strefID (str): Reference ID of the order
+            strefID (int): Reference ID of the order
         """
         body = {"strategyname": strategyName, "strefID": strefID}
         url = "".join([self.BASEURL, self._routes['stopOperation']])
@@ -547,7 +547,7 @@ class SparkLib():
             token (str): Token of the Symbol
             positionType (str): Position type of the order
             tradedPrice (float): Traded price
-            tradedAt (float): Traded at
+            tradedAt (str): Traded at
             ordersPlaced (float): Orders placed
             qty (int): Quantity
         """
@@ -555,12 +555,23 @@ class SparkLib():
         url = "".join([self.BASEURL, self._routes['manualSquareOff']]).format(acname = accountName, stname = strategyName, token = token, positionType = positionType)
         return self._request("POST", url, body = body)
 
+    def deleteOrder(self,strefID,reftag):
+        """
+        Delete the order
+
+        Args:
+            strefID (int): Reference ID of the order
+            reftag (int): Reference id of the order
+        """
+        url = "".join([self.BASEURL, self._routes['order.delete']]).format(strefID = strefID, reftag = reftag)
+        return self._request("DELETE", url)
+
     def deleteTrade(self,TDno):
         """
         Delete the trade
 
         Args:
-            TDno (str): Trade number
+            TDno (int): Trade number
         """
         url = "".join([self.BASEURL, self._routes['trade.delete']]).format(TDno = TDno)
         return self._request("DELETE", url)
@@ -593,6 +604,8 @@ class SparkLib():
         url = "".join([self.BASEURL, self._routes['contractMaster']])
         return self._request("GET", url)
 
+
+
     def _request(self, method, url, body = None, data = None, is_header = True, timeout = _timeout):
         """
         Make the request to the server
@@ -609,10 +622,10 @@ class SparkLib():
             dict
         """
         try :
+            print(method, url, body, data, timeout,self.header)
             resp = self.reqsession.request(method, url, json = body, data = data, timeout = timeout,
                                            headers = self.header)
-            # print(method, url, body, data, timeout,self.header)
-            # print(resp.text)
+            print(resp.text)
             data = resp.json()
             return data
 
