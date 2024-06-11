@@ -60,6 +60,7 @@ class SparkLib():
         self.apikeys = apikeys
         self.reqsession = requests.Session()
         self.header = {}
+        self.accessToken = ""
         if access_token:
             self.set_AccessToken(access_token)
 
@@ -73,6 +74,7 @@ class SparkLib():
         Returns:
             None
         """
+        self.accessToken = access_token
         self.header.update({"Authorization" : "Bearer {}".format(access_token)})
 
     def generate_token(self):
