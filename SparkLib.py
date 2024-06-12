@@ -96,7 +96,7 @@ class SparkLib():
             return resp
         else :
             self.set_AccessToken(resp['access_token'])
-            return {"stutus" : True, "error" : False, "data" : [resp], "message" : "User Authorized"}
+            return {"status" : True, "error" : False, "data" : [resp], "message" : "User Authorized"}
 
     def profile(self):
         """
