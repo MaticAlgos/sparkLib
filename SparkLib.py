@@ -630,8 +630,6 @@ class SparkLib():
         try :
             resp = self.reqsession.request(method, url, json = body, data = data, timeout = timeout,
                                            headers = self.header)
-            print(method, url, body, data, timeout,self.header)
-            print(resp.text)
             data = resp.json()
             return data
 
