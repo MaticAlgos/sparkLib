@@ -624,10 +624,8 @@ class SparkLib():
             dict
         """
         try :
-            print(method, url, body, data, timeout,self.header)
             resp = self.reqsession.request(method, url, json = body, data = data, timeout = timeout,
                                            headers = self.header)
-            print(resp.text)
             data = resp.json()
             return data
 
