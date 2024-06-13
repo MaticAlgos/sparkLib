@@ -23,7 +23,7 @@ class SparkLib():
         "account.all" : "/account",
         "account.one" : "/account/{accountName}",
         "account.activate": "/activate-account/{account}/{yn}",
-        "authcode.validate" : "/validate_authcode/{broker}",
+        "authcode.validate" : "/validate_authcode/{broker}?auth_code={auth_code}",
         "authcode.generate" : "/login/{account}",
         "strategy" : "/strategy",
         "strategy.create" : "/strategy",
@@ -98,7 +98,7 @@ class SparkLib():
             return resp
         else :
             self.set_AccessToken(resp['access_token'])
-            return {"stutus" : True, "error" : False, "data" : [resp], "message" : "User Authorized"}
+            return {"status" : True, "error" : False, "data" : [resp], "message" : "User Authorized"}
 
     def profile(self):
         """
@@ -259,13 +259,23 @@ class SparkLib():
             broker (str): Name of the broker
             authcode (str): Auth code
         """
-        #make upper case of the broker
-        url = "".join([self.BASEURL, self._routes['authcode.validate'].format(broker = broker.upper())])
-        return self._request("POST", url, data = {"auth_code" : authcode})
+        url = "".join([self.BASEURL, self._routes['authcode.validate'].format(broker = broker.upper(), auth_code = authcode)])
+        return self._request("POST", url)
 
-    def activateAccount(self, accountName, activate):
+    def activateAccount(self, accountName, activate='Y'):
         """
         Activate the account
+
+        Args:
+            accountName (str): Name of the account
+            yn (str): Y or N
+        """
+        url = "".join([self.BASEURL, self._routes['account.activate'].format(account = accountName, yn = activate.upper())])
+        return self._request("POST", url)
+
+    def deactivateAccount(self, accountName, activate='N'):
+        """
+        Deactivate the account
 
         Args:
             accountName (str): Name of the account
@@ -330,9 +340,10 @@ class SparkLib():
             strategyName (str): Name of the strategy
             accountName (str): Name of the account
             Multiplier (int): Multiplier of the strategy
-            Activate (int): Activate the strategy
+            Activate (str): Activate the strategy
             Capital (int): Capital of the strategy
         """
+        Activate = 0 if Activate == 'N' else 1
         body ={
             'StrategyName': strategyName,
             'AccountName': accountName,
@@ -352,12 +363,11 @@ class SparkLib():
             strategyName (str): Name of the strategy
             accountName (str): Name of the account
             Multiplier (int): Multiplier of the strategy
-            Activate (int): Activate the strategy
+            Activate (str): Activate the strategy
             Capital (int): Capital of the strategy
         """
         activate = 0 if Activate == 'N' else 1
         body = {'Multiplier': Multiplier, 'Activate': activate, 'Capital': Capital}
-        #   'https://apiv.maticalgos.com/linkstrategy?st=as&ac=as' \
         url = "".join([self.BASEURL, self._routes['modifylinkstrategy']]).format(st = strategyName, ac = accountName)
         return self._request("PUT", url, body = body)
 
