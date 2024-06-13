@@ -23,7 +23,7 @@ class SparkLib():
         "account.all" : "/account",
         "account.one" : "/account/{accountName}",
         "account.activate": "/activate-account/{account}/{yn}",
-        "authcode.validate" : "/validate_authcode/{broker}",
+        "authcode.validate" : "/validate_authcode/{broker}?auth_code={authcode}",
         "authcode.generate" : "/login/{account}",
         "strategy" : "/strategy",
         "strategy.create" : "/strategy",
@@ -258,8 +258,9 @@ class SparkLib():
             authcode (str): Auth code
         """
         #make upper case of the broker
-        url = "".join([self.BASEURL, self._routes['authcode.validate'].format(broker = broker.upper())])
-        return self._request("POST", url, data = {"auth_code" : authcode})
+        url = "".join([self.BASEURL, self._routes['authcode.validate'].format(broker = broker,
+                                                                            authcode = authcode)])
+        return self._request("POST", url)
 
     def activateAccount(self, accountName, activate):
         """
