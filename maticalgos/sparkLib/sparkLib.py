@@ -23,6 +23,7 @@ class SparkLib():
         "account.all" : "/account",
         "account.one" : "/account/{accountName}",
         "account.activate": "/activate-account/{account}/{yn}",
+        "sessionid.validate" : "/validate_session/{accountname}?sessionid={sessionid}",
         "authcode.validate" : "/validate_authcode/{broker}?auth_code={auth_code}",
         "authcode.generate" : "/login/{account}",
         "strategy" : "/strategy",
@@ -251,6 +252,18 @@ class SparkLib():
         url = "".join([self.BASEURL, self._routes['authcode.generate'].format(account = accountName)])
         return self._request("POST", url)
 
+    def validateSessionid(self, accountname, sessionid):
+        """
+        Used to directly send the session id to spark.
+
+        Args:
+            broker (str): Name of the broker
+            authcode (str): Auth code
+        """
+        #make upper case of the broker
+        url = "".join([self.BASEURL, self._routes['sessionid.validate'].format(accountname = accountname, sessionid = sessionid)])
+        return self._request("POST", url)
+    
     def validateAuthcode(self, broker, authcode):
         """
         Validate the auth code
@@ -423,7 +436,7 @@ class SparkLib():
         url = "".join([self.BASEURL, self._routes['SquareOff_url'].format(ctype = ctype, stname = strategyName, acname = accountName)])
         return self._request("GET", url)
 
-    def orderbook(self,accountName, strategyName, withorders=False,strefid = None, reftag = None):
+    def orderbook(self,accountName, strategyName, withorders=False,strefid = None, reftag = None, today = True):
         """
         Get the order book
 
@@ -438,6 +451,8 @@ class SparkLib():
         if strefid : url = url + "&strefid=" + strefid
         if reftag : url = url + "&reftag=" + reftag
         if withorders : url = url + "&withorders=" + withorders
+        if today : url = url + "&today=" + today 
+        if not today : url = url + "&today" + False
         return self._request("GET", url)
 
     def tradebook(self,startDate,endDate,strategyName,accountName):
