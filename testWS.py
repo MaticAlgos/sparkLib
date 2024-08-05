@@ -28,20 +28,4 @@ time.sleep(20)
 order.close_connection()
 
 
-from maticalgos.sparkLib import SparkLib
-from maticalgos.sparkLib.utility import IIFLXTSWS
-
-
-
-spk = SparkLib(apikeys="b1402ac9a97d11f")
-spk.generate_token()
-
-data = spk.getOneAccount("IIFLData2")['data'][0]
-dataws = IIFLXTSWS(data)
-dataws.connect()
-dataws.Subscribe(tokens=['NSE:212'])
-dataws.closeConnection()
-
-onLTP = None
-
 
