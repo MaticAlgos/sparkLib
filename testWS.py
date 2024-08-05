@@ -27,3 +27,7 @@ order.connect()
 time.sleep(20)
 order.close_connection()
 
+def parse_requirements(filename):
+    with open(filename, 'r') as f:
+        return f.read().splitlines()
+    
