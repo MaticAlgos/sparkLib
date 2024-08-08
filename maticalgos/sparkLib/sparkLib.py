@@ -96,7 +96,7 @@ class SparkLib():
         resp = self._request("POST", url, data = data)
 
         if not resp.get("access_token") or resp.get("access_token") == "" :
-            return resp
+            return {"status" : True, "error" : False, "data" : [resp], "message" : "Unable to authorize user."}
         else :
             self.set_AccessToken(resp['access_token'])
             return {"status" : True, "error" : False, "data" : [resp], "message" : "User Authorized"}

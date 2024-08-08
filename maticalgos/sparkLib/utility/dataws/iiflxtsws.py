@@ -18,18 +18,17 @@ exchange_mapping = {
 resp_token_mapping = {
     "26001": "26009",
     "26034": "26037",
-    "26121": "26074"
+    "26121": "26074",
 }
 
 class IIFLXTSWS():
-
     tmdiff = (datetime.datetime(1980, 1, 1, 0, 0, 0) - datetime.datetime(1970, 1, 1, 0, 0, 0)).total_seconds()
     tokenmapping = {value: key for key, value in resp_token_mapping.items()}
     apiURL = 'https://ttblaze.iifl.com/apimarketdata' 
     URL = "https://ttblaze.iifl.com"
     Tokens = {}
 
-    def __init__(self, accountData, dataType = "ltpUpdates", 
+    def __init__(self, accountData, dataType = "ltp", 
                  onLtp = None, 
                  onDepth = None, 
                  onError = None, 
@@ -37,7 +36,7 @@ class IIFLXTSWS():
                  onOpen = None,
                  ) :
         self.accountData = accountData
-        self.dType = 1501 if dataType == "ltpUpdates" else 1502 if dataType == "depth" else None #Currently Only supports LTP Updates.
+        self.dType = 1501 if dataType == "ltp" else 1502 if dataType == "depth" else None #Currently Only supports LTP Updates.
         self.onLtp = self.__onLTP if not onLtp  else onLtp
         self.onDepth = self.__onDepth if not onDepth else onDepth
         self.onError = self.__onError if not onError else onError
@@ -53,31 +52,33 @@ class IIFLXTSWS():
             if token in resp_token_mapping :
                 token = resp_token_mapping[token]
             return exc + ":" + str(token)
-        except: 
+        except : 
+            self.onError(f"Exch : {exc}, Token : {token} received from XTSWS not found, Traceback : {traceback.format_exc()}")
             raise Exception("Exchange Name not found")
         
     def onLTPHandler(self, message):
         try: 
-            data = json.loads(data)
-            timestamp = self.tmdiff + data['LastUpdateTime']
-            dt = datetime.utcfromtimestamp(timestamp)
+            data = json.loads(message)
+            touchlineData = data if not data.get("Touchline") else data['Touchline']
+            timestamp = self.tmdiff + touchlineData['LastUpdateTime']
+            dt = datetime.datetime.utcfromtimestamp(timestamp)
             token = self.getToken(data['ExchangeSegment'], data['ExchangeInstrumentID'])
             msg = {"timestamp_str" : str(dt), 
-                    "timestamp" : str(int(float(timestamp))),
-                    "symbol" : token, 
-                    "ltp" : data['LastTradedPrice'],
-                    "prev_day_close" : data['Close'], 
-                    "oi" : 0,
-                    "prev_day_oi" : 0,
-                    "turnover" : data['TotalTradedQuantity'], 
-                    "best_bid_price" : data['BidInfo']['Price'], 
-                    "best_ask_price" : data['AskInfo']['Price'], 
-                    "best_bid_qty" : data['BidInfo']['Size'],
-                    "best_ask_qty" : data['AskInfo']['Size'], 
-                    "ttq" : data['TotalTradedQuantity'],  
-                    "token" : token}
+                   "timestamp" : str(int(float(timestamp))),
+                   "symbol" : token, 
+                   "ltp" : touchlineData['LastTradedPrice'],
+                   "prev_day_close" : touchlineData['Close'], 
+                   "oi" : 0,
+                   "prev_day_oi" : 0,
+                   "turnover" : touchlineData['TotalTradedQuantity'], 
+                   "best_bid_price" : touchlineData['BidInfo']['Price'], 
+                   "best_ask_price" : touchlineData['AskInfo']['Price'], 
+                   "best_bid_qty" : touchlineData['BidInfo']['Size'],
+                   "best_ask_qty" : touchlineData['AskInfo']['Size'], 
+                   "ttq" : touchlineData['TotalTradedQuantity'],  
+                   "token" : token}
             self.onLtp(msg)
-            
+                
         except Exception as e : 
             self.onError(f"Error : {e}, Traceback : {traceback.format_exc()}")
 
@@ -99,27 +100,11 @@ class IIFLXTSWS():
     def __onOpen(self):
         print("Connection Opened")
 
-    def runAction(self):
-        while self.run : 
-            data = self.actionQueue.get()
-            if data['action'] == "subscribe" : 
-                threading.Thread(target = lambda : self.__Subscribe(data['tokens'])).start()
-            
-            elif data['action'] == "unsubscribe" : 
-                threading.Thread(target = lambda : self.__Unsubscribe(data['tokens'])).start()
-            time.sleep(1)
-
-    def Subscribe(self, tokens) : 
-        self.actionQueue.put({"action" : "subscribe" , "tokens" : tokens})
-
-    def Unsubscribe(self, tokens):
-        self.actionQueue.put({"action" : "unsubscribe", "tokens" : tokens})
-
-    def __Subscribe(self, tokens):
+    def Subscribe(self, tokens):
         try: 
             Instruments = []
             for i in tokens:
-                if i not in self.Tokens.keys(): 
+                if i not in self.Tokens.keys() : 
                     tk = i.split(":")
                     exch = 1 if tk[0] == "NSE" else 2 if tk[0] == "NFO" else "3" if tk[0] == "CDS" else 11 if tk[0] == "BSE" else 12 if tk[0] == "BFO" else None
                     token = int(tk[1])
@@ -128,7 +113,6 @@ class IIFLXTSWS():
                     if exch != None: 
                         self.Tokens[str(exch) + ":" + str(token)] = i
                         Instruments.append({"exchangeSegment" : exch, 'exchangeInstrumentID' : int(token)})
-
             if Instruments != [] : 
                 response = self.xt.subscribe(Instruments, self.dType)
                 if response.get('error') :
@@ -136,7 +120,7 @@ class IIFLXTSWS():
         except Exception as e : 
             self.onError(f"Error in token Subscription : {e}, Traceback : {traceback.format_exc()}")
 
-    def __Unsubscribe(self, tokens):
+    def Unsubscribe(self, tokens):
         try: 
             Instruments = []
             for i in tokens:
@@ -235,7 +219,4 @@ class IIFLXTSWS():
     
     def connect(self):
         threading.Thread(target=self.__connect).start()
-        threading.Thread(target=self.runAction).start()
-        # while self.run:
-        #     time.sleep(1)
 
