@@ -4,31 +4,17 @@ import json
 import traceback
 import queue
 import time
-
-from .dependencies import XTSMDSocket_io, XTS_MarketData
-
-exchange_mapping = {
-    "1" : "NSE",
-    "2" : "NFO",
-    "3" : "CDS",
-    "11" : "BSE",
-    "12" : "BFO"
-}
-
-resp_token_mapping = {
-    "26001": "26009",
-    "26034": "26037",
-    "26121": "26074",
-}
+import os 
+from .dependencies import XTSMDSocket_io, XTS_MarketData, SparkLib
 
 class IIFLXTSWS():
     tmdiff = (datetime.datetime(1980, 1, 1, 0, 0, 0) - datetime.datetime(1970, 1, 1, 0, 0, 0)).total_seconds()
-    tokenmapping = {value: key for key, value in resp_token_mapping.items()}
     apiURL = 'https://ttblaze.iifl.com/apimarketdata' 
     URL = "https://ttblaze.iifl.com"
-    Tokens = {}
+    TOKENS = {}
+    BROKER = "IIFLXTS"
 
-    def __init__(self, accountData, dataType = "ltp", 
+    def __init__(self, accountData, accessToken = None, dataType = "ltp", 
                  onLtp = None, 
                  onDepth = None, 
                  onError = None, 
@@ -44,43 +30,49 @@ class IIFLXTSWS():
         self.onOpen = self.__onOpen if not onOpen else onOpen
         self.actionQueue = queue.Queue()
         self.run = True
-
-    def getToken(self, exch, token):
-        try : 
-            token = int(token)
-            exc = exchange_mapping[str(exch)]
-            if token in resp_token_mapping :
-                token = resp_token_mapping[token]
-            return exc + ":" + str(token)
-        except : 
-            self.onError(f"Exch : {exc}, Token : {token} received from XTSWS not found, Traceback : {traceback.format_exc()}")
-            raise Exception("Exchange Name not found")
+        if not accessToken :
+            if os.environ.get("MATICALGOS_AccessToken"):
+                accessToken = os.environ["MATICALGOS_AccessToken"] 
+            else: 
+                raise Exception("Please generate access token.")
+        self.spk = SparkLib(access_token=accessToken)
         
+    def getTokens(self, tokens):
+        data = self.spk.getBrokerTokens(tokens=tokens, broker=self.BROKER)
+        if data['status'] and not data['error'] : 
+            tokens = data['data']
+            return tokens
+        else: 
+            raise Exception (data['message'])
+    
+    def getSymbol(self, exchange, token):
+        return self.TOKENS[", ".join([str(exchange), str(token)])]
+    
     def onLTPHandler(self, message):
         try: 
             data = json.loads(message)
             touchlineData = data if not data.get("Touchline") else data['Touchline']
-            timestamp = self.tmdiff + touchlineData['LastUpdateTime']
+            timestamp = self.tmdiff + data['ExchangeTimeStamp'] if data.get("ExchangeTimeStamp") else self.tmdiff + data['LastUpdateTime']  #touchlineData['LastUpdateTime']
             dt = datetime.datetime.utcfromtimestamp(timestamp)
-            token = self.getToken(data['ExchangeSegment'], data['ExchangeInstrumentID'])
+            token = self.getSymbol(data['ExchangeSegment'], data['ExchangeInstrumentID'])
             msg = {"timestamp_str" : str(dt), 
                    "timestamp" : str(int(float(timestamp))),
                    "symbol" : token, 
-                   "ltp" : touchlineData['LastTradedPrice'],
-                   "prev_day_close" : touchlineData['Close'], 
+                   "ltp" : float(touchlineData['LastTradedPrice']),
+                   "prev_day_close" : float(touchlineData['Close']), 
                    "oi" : 0,
                    "prev_day_oi" : 0,
-                   "turnover" : touchlineData['TotalTradedQuantity'], 
-                   "best_bid_price" : touchlineData['BidInfo']['Price'], 
-                   "best_ask_price" : touchlineData['AskInfo']['Price'], 
-                   "best_bid_qty" : touchlineData['BidInfo']['Size'],
-                   "best_ask_qty" : touchlineData['AskInfo']['Size'], 
-                   "ttq" : touchlineData['TotalTradedQuantity'],  
+                   "turnover" : int(touchlineData['TotalTradedQuantity']), 
+                   "best_bid_price" : float(touchlineData['BidInfo']['Price']), 
+                   "best_ask_price" : float(touchlineData['AskInfo']['Price']), 
+                   "best_bid_qty" : int(touchlineData['BidInfo']['Size']),
+                   "best_ask_qty" : int(touchlineData['AskInfo']['Size']), 
+                   "ttq" : int(touchlineData['TotalTradedQuantity']),  
                    "token" : token}
             self.onLtp(msg)
                 
         except Exception as e : 
-            self.onError(f"Error : {e}, Traceback : {traceback.format_exc()}")
+            self.onError(f"Error : {e}, Traceback : {traceback.format_exc()}, data : {message}")
 
     def onDepthHandler(self, message):
         self.onDepth(message)
@@ -102,45 +94,48 @@ class IIFLXTSWS():
 
     def Subscribe(self, tokens):
         try: 
+            notFound = []
+            tokens = self.getTokens(tokens)
             Instruments = []
-            for i in tokens:
-                if i not in self.Tokens.keys() : 
-                    tk = i.split(":")
-                    exch = 1 if tk[0] == "NSE" else 2 if tk[0] == "NFO" else "3" if tk[0] == "CDS" else 11 if tk[0] == "BSE" else 12 if tk[0] == "BFO" else None
-                    token = int(tk[1])
-                    if token in self.tokenmapping : 
-                        token = self.tokenmapping[token]
-                    if exch != None: 
-                        self.Tokens[str(exch) + ":" + str(token)] = i
-                        Instruments.append({"exchangeSegment" : exch, 'exchangeInstrumentID' : int(token)})
+            for tk in tokens:
+                wsToken = tk['wsToken']
+                if wsToken != None : 
+                    exch, tok = wsToken.split(", ")
+                    Instruments.append({"exchangeSegment" : exch, 'exchangeInstrumentID' : int(tok)})
+                    self.TOKENS[wsToken] = tk['token']
+                else: 
+                    notFound.append(tk['token'])
+            
             if Instruments != [] : 
-                response = self.xt.subscribe(Instruments, self.dType)
+                response = self.xtconn.subscribe(Instruments, self.dType)
                 if response.get('error') :
                     self.onError(f"Error in token Subscription : {response}")
+            if notFound != [] : 
+                self.onError(f"ERROR : Unable to find tokens for {notFound} ")
         except Exception as e : 
             self.onError(f"Error in token Subscription : {e}, Traceback : {traceback.format_exc()}")
 
     def Unsubscribe(self, tokens):
         try: 
+            notFound = []
+            tokens = self.getTokens(tokens)
             Instruments = []
-            for i in tokens:
-                tk = i.split(":")
-                exch = 1 if tk[0] == "NSE" else 2 if tk[0] == "NFO" else "3" if tk[0] == "CDS" else 11 if tk[0] == "BSE" else 12 if tk[0] == "BFO" else None
-                token = tk[1]
-                if token in self.tokenmapping : 
-                    token = self.tokenmapping[token]
-                if exch != None: 
-                    Instruments.append({"exchangeSegment" : exch, 'exchangeInstrumentID' : int(token)})
-                if i in self.Tokens.keys():
-                    self.Tokens.pop(i)
-
+            for tk in tokens:
+                wsToken = tk['wsToken']
+                if wsToken != None : 
+                    exch, tok = wsToken.split(", ")
+                    Instruments.append({"exchangeSegment" : exch, 'exchangeInstrumentID' : int(tok)})
+                else: 
+                    notFound.append(tk['token'])
+            
             if Instruments != [] : 
-                response = self.xt.unsubscribe(Instruments, self.dType)
+                response = self.xtconn.unsubscribe(Instruments, self.dType)
                 if response.get('error') :
-                    self.onError(f"Error in token Unsubscription : {response}")
-
+                    self.onError(f"Error in token Subscription : {response}")
+            if notFound != [] : 
+                self.onError(f"ERROR : Unable to find tokens for {notFound} ")
         except Exception as e : 
-            self.onError(f"Error in token Subscription : {e}, Traceback : {traceback.format_exc()}") 
+            self.onError(f"Error in token Unsubscription : {e}, Traceback : {traceback.format_exc()}")
 
     def on_message(self, data):
         pass
@@ -185,7 +180,6 @@ class IIFLXTSWS():
         self.onClose()
 
     def __connect(self):
-        self.xt = XTS_MarketData(sessionid = self.accountData['Sessionid'], URL=self.apiURL)
         self.soc = XTSMDSocket_io(token=self.accountData['Sessionid'], userID=self.accountData['Clientid'],
                                   reconnection_attempts=5, URL=self.URL)
         self.soc.on_connect = self.onOpen
@@ -215,8 +209,9 @@ class IIFLXTSWS():
         try: 
             self.soc.connect()
         except Exception as e :  
-            self.onError(f"Error : {e}, Traceback : {traceback.format_exc()}")
+            self.onClose(f"Error : {e}, Traceback : {traceback.format_exc()}")
     
     def connect(self):
+        self.xtconn = XTS_MarketData(sessionid = self.accountData['Sessionid'], URL=self.apiURL)
         threading.Thread(target=self.__connect).start()
 

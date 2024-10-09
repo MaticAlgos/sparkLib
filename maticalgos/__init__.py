@@ -1,1 +1,1 @@
-from .sparkLib import SparkLib, OrderSocket, dataws
+from .sparkLib import SparkLib, OrderSocket

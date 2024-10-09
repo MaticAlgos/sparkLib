@@ -2,18 +2,12 @@ from typing import Any, Callable, Optional
 import websocket
 import time
 import threading
+import os 
 
 class OrderSocket:
-    _instance = None
-
-    def __new__(cls, *args, **kwargs):
-        if not cls._instance:
-            cls._instance = super().__new__(cls)
-        return cls._instance
-
     def __init__(
             self,
-            access_token: str,
+            access_token: str = None,
             on_order: Optional[Callable] = None,
             on_error: Optional[Callable] = None,
             on_connect: Optional[Callable] = None,
@@ -23,6 +17,12 @@ class OrderSocket:
             max_reconnect_attempts: int = 50,
             reconnect_delay: int = 2
     ) -> None:
+        if not access_token :
+            if os.environ.get("MATICALGOS_AccessToken"):
+                access_token = os.environ["MATICALGOS_AccessToken"] 
+            else: 
+                raise Exception("Please generate access token.")
+            
         self.__access_token = access_token
         self.__url = "wss://apiv.maticalgos.com/orderWS"
         self.__ws_object = None

@@ -1,0 +1,1 @@
+{"level":"ERROR","location":"[<lambda>:1664] data_ws","message":"cannot notify on un-acquired lock","timestamp":"2024-08-22 21:29:21,168+0530","service":"FyersDataSocket"}

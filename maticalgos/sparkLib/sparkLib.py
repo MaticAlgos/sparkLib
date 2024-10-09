@@ -6,6 +6,7 @@ Created on Fri Nov 17 02:02:52 2023
 """
 
 import requests
+import os 
 
 class SparkLib():
 
@@ -51,7 +52,9 @@ class SparkLib():
         "manualSquareOff" : "/manual-squareoff/?acname={acname}&stname={stname}&token={token}&positionType={positionType}",
         "isHoliday" : "/isHoliday/?exch={exch}",
         "freezeqty" : "/master-freezeqty?symbol={symbol}",
+        "tokenMappings" : "/token-mappings?broker={broker}",
         "contractMaster" : "/contract-master/",
+        "holidays" : "/holidays"
     }
     _timeout = 15
 
@@ -75,6 +78,7 @@ class SparkLib():
         Returns:
             None
         """
+        os.environ["MATICALGOS_AccessToken"] = access_token
         self.accessToken = access_token
         self.header.update({"Authorization" : "Bearer {}".format(access_token)})
 
@@ -96,7 +100,7 @@ class SparkLib():
         resp = self._request("POST", url, data = data)
 
         if not resp.get("access_token") or resp.get("access_token") == "" :
-            return {"status" : True, "error" : False, "data" : [resp], "message" : "Unable to authorize user."}
+            return {"status" : False, "error" : True, "data" : [resp], "message" : "Unable to authorize user."}
         else :
             self.set_AccessToken(resp['access_token'])
             return {"status" : True, "error" : False, "data" : [resp], "message" : "User Authorized"}
@@ -212,7 +216,7 @@ class SparkLib():
             symbol (str): Symbol of the instrument
             exchange (str): Exchange of the instrument (NSE, BSE, NFO, BFO)
             expiry (str, optional): Expiry of the instrument.(format: yyyy-mm-dd). Defaults to None.
-            instrument (str, optional): Instrument of the symbol. Defaults to None.
+            instrument (str, optional): Instrument of the symbol. Defaults to None. OPT | FUT
         """
         body = locals()
         del body['self']
@@ -612,6 +616,16 @@ class SparkLib():
         """
         url = "".join([self.BASEURL, self._routes['isHoliday']]).format(exch = exch)
         return self._request("GET", url)
+    
+    def holidays(self,exch=None):
+        """
+        Get Holiday Dates list
+
+        Args:
+            exch (str): Exchange name
+        """
+        url = "".join([self.BASEURL, self._routes['isHoliday']]).format(exch = exch)
+        return self._request("GET", url)
 
     def freezeqty(self,symbol):
         """
@@ -631,7 +645,9 @@ class SparkLib():
         url = "".join([self.BASEURL, self._routes['contractMaster']])
         return self._request("GET", url)
 
-
+    def getBrokerTokens(self, tokens:list, broker:str):
+        url = "".join([self.BASEURL,self._routes['tokenMappings']]).format(broker=broker)
+        return self._request("POST", url, body={"tokens" : tokens})
 
     def _request(self, method, url, body = None, data = None, is_header = True, timeout = _timeout):
         """
