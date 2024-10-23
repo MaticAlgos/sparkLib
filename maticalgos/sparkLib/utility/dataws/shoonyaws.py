@@ -71,19 +71,26 @@ class ShoonyaWS():
                 if None not in data.values() : 
                     token = self.getSymbol(message['e'], message['tk'])
                     dtime = datetime.datetime.fromtimestamp(int(data['time']))
-                    openInterest = 0 if token.split(":")[0] not in ['NFO',"BFO","MCX"] else message.get('oi') if message.get('oi') != None else 0
+                    openInterest = 0 if token.split(":")[0] not in ['NFO',"BFO","MCX"] else message.get('oi') 
                     if openInterest == None :
-                        openInterest = self.dataStore[token]['oi'] if self.dataStore.get(token) != None else 0
-                    volume = message.get('v') if message.get('v') != None else data[token]['v'] if data.get(token) != None else 0 
+                        openInterest = self.dataStore[token]['oi'] if self.dataStore.get(token) != None and self.dataStore[token].get('v') else 0
+                    volume = message.get('v') if (message.get('v') != None and message.get('v') != 0) \
+                                else self.dataStore[token]['v'] if (self.dataStore.get(token) != None and self.dataStore[token].get('v')) else 0 
+                    volume = 0 if volume == None else volume
                     turnover = volume
-                    prevClose = None
-                    if self.dataStore.get(token) != None :
-                        prevClose = self.dataStore[token]['c'] if self.dataStore[token].get("c") != None else None
+                    prevClose = message.get('c') if message.get('c') != None \
+                                else round(float(message.get('lp'))/(1-(float(message.get('pc'))/100)),2) if (message.get('pc') != None and message.get('lp') != None) \
+                                else self.dataStore.get(token)['c'] if self.dataStore.get(token) != None and self.dataStore[token].get('c') != None else \
+                                0.0
+                              
+                    # prevClose = None
+                    # if self.dataStore.get(token) != None :
+                    #     prevClose = self.dataStore[token]['c'] if self.dataStore[token].get("c") != None else None
                         
-                    if not self.dataStore.get(token) or prevClose == None :  
-                        prevClose = message.get('c') if message.get('c') != None else \
-                                float(data['ltp'])/(1-(float(message.get('pc'))/100)) if message.get('pc') != None \
-                                else 0.0
+                    # if not self.dataStore.get(token) or prevClose == None :  
+                    #     prevClose = message.get('c') if message.get('c') != None else \
+                    #             float(data['ltp'])/(1-(float(message.get('pc'))/100)) if message.get('pc') != None \
+                    #             else 0.0
                                     
                     msg = {
                                     "timestamp_str" : str(dtime),
@@ -93,7 +100,7 @@ class ShoonyaWS():
                                     "prev_day_close" : prevClose, 
                                     "oi" : int(openInterest), 
                                     "prev_day_oi" : 0, 
-                                    "turnover" : float(turnover) , 
+                                    "turnover" : int(turnover) , 
                                     "best_bid_price" : float(data['bidPrice']), 
                                     "best_ask_price" : float(data['askPrice']), 
                                     "best_bid_qty" : int(data["bidQty"]),
@@ -107,8 +114,8 @@ class ShoonyaWS():
                     if None not in  [message.get('tk'),message.get('e')]:
                         token = self.getSymbol(message.get('e'), message.get('tk'))
                         prevclose = message.get('c') if message.get('c') != None \
-                                    else float(message.get['lp'])/(1-(float(message.get('pc'))/100)) if (message.get('pc') != None and message.get('lp') != None) \
-                                    else 0.0
+                                    else float(message.get('lp'))/(1-(float(message.get('pc'))/100)) if (message.get('pc') != None and message.get('lp') != None) \
+                                    else None
                         data = {
                                 "c" : prevclose,
                                 "oi" : message.get('oi'),

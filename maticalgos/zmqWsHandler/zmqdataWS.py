@@ -269,13 +269,13 @@ class TickHandler():
                                             "h" : data['ltp'], 
                                             "l" : data['ltp'], 
                                             "c" : data['ltp'], 
-                                            "v" : data['ttq'] - prev_volume,
+                                            "v" : data['ttq'], #- prev_volume,
                                             "oi" : 0 if data.get('oi') == None else data.get('oi')}
                 self.MINdata[minval][token]['tsp'] = str(int(datetime.datetime.strptime(self.MINdata[minval][token]['ts'], "%Y-%m-%d %H:%M:%S").timestamp()))
             
             ltp = data['ltp'] 
             self.MINdata[minval][token]['c'] = ltp
-            self.MINdata[minval][token]['v'] = data['ttq'] - prev_volume
+            self.MINdata[minval][token]['v'] = data['ttq'] #- prev_volume
             
             if ltp > self.MINdata[minval][token]['h']: 
                 self.MINdata[minval][token]['h'] = ltp
@@ -295,11 +295,18 @@ class TickHandler():
     def __connectRedis(self):
         return redis.Redis(connection_pool= self.redispool)
     
+    def chunk_list(self, lst, chunk_size):
+        """Split a list into chunks of the specified size."""
+        return [lst[i:i + chunk_size] for i in range(0, len(lst), chunk_size)]
+
     def _minPush(self, minval):
         try :
             data = self.MINdata[minval]
             zmqData = ['min:{topic} _&_ {messagedata}'.format(topic=d, messagedata = json.dumps(data[d])) for d in data]
-            self.pubsocket.send_string('{data}'.format(data=zmqData))
+            chunks = self.chunk_list(zmqData, 10)
+            for chunk in chunks : 
+                self.pubsocket.send_string('{data}'.format(data=chunk))
+                
             if self.__toRedis: 
                 rcon = self.__connectRedis()
                 pipe = rcon.pipeline()

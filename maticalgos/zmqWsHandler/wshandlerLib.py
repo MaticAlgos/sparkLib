@@ -225,6 +225,11 @@ class redisData():
         df = df.rename(columns={"ts":"datetime",'tk':'token',"o":"open","h":'high','l':"low","c":"close","v":"volume"})
         df['datetime'] = pd.to_datetime(df['datetime'], format="%Y-%m-%d %H:%M:%S")
         df = df.set_index('datetime')
+        initVal = df['volume'].iloc[0]
+        df[['volume']] = df[['volume']].fillna(0)
+        df["volume"] = df['volume'] - df["volume"].shift(1, fill_value = 0)
+        df.loc[df.index[0], 'volume'] = initVal
+
         if timeframe != 1 : 
             df = df.resample(f'{str(timeframe)}min', origin = datetime.datetime.combine(df.iloc[0].name.date(), origin)).agg({"open" : "first", 
                                                           "token" : "last",

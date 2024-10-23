@@ -74,23 +74,33 @@ class Kotakws():
                         if None not in data.values() : 
                             dtime = datetime.datetime.strptime(data['time'], "%d/%m/%Y %H:%M:%S")
                             token = self.getSymbol(data['exchange'], data['token'])
-                            openInterest = 0 if token.split(":")[0] not in ['NFO',"BFO","MCX"]  else dt.get('oi') if dt.get('oi') != None else None
+                            openInterest = 0 if token.split(":")[0] not in ['NFO',"BFO","MCX"]  else dt.get('oi')
                             if openInterest == None :
                                 try:
                                     openInterest = self.dataStore[token]['oi'] if self.dataStore.get(token) != None else 0
                                 except:
                                     openInterest = 0
-                            turnover = dt.get('to') if dt.get('to') != None else data[token]['to'] if data.get(token) != None else 0 
-                            volume = dt.get('v') if dt.get('v') != None else data[token]['v'] if data.get(token) != None else 0 
-                            
-                            if self.dataStore.get(token) != None :
-                                try: 
-                                    prevClose = self.dataStore[token]['c']
-                                except:
-                                    prevClose = 0.0
-                            else: 
-                                prevClose = dt.get('c') if dt.get('c') != None else float(data['ltp'])-float(dt.get('cng')) if dt.get('cng') != None else 0.0
-                
+                            turnover = dt.get('to') if dt.get('to') != None else \
+                                        self.dataStore[token]['to'] if self.dataStore.get(token) != None and self.dataStore[token].get('to') != None \
+                                        else 0
+                            turnover = 0 if turnover == None else turnover   
+                            # volume = dt.get('v') if dt.get('v') != None else data[token]['v'] if data.get(token) != None else 0 
+                            volume = dt.get('v') if dt.get('v') != None and dt.get('v') != 0 else \
+                                        self.dataStore[token]['v'] if self.dataStore.get(token) != None and self.dataStore[token].get('v') != None \
+                                        else 0 
+                            volume = 0 if volume == None else volume
+                            prevClose = dt.get('c') if dt.get('c') != None \
+                                        else float(data.get('ltp'))-float(dt.get('cng')) if dt.get('cng') != None \
+                                        else self.dataStore.get(token)['c'] if self.dataStore.get(token) != None and self.dataStore[token].get('c') != None else \
+                                        0.0
+                                        
+                            # if self.dataStore.get(token) != None :
+                            #     try: 
+                            #         prevClose = self.dataStore[token]['c']
+                            #     except:
+                            #         prevClose = 0.0
+                            # else: 
+                            #     prevClose = dt.get('c') if dt.get('c') != None else float(data['ltp'])-float(dt.get('cng')) if dt.get('cng') != None else 0.0
                             msg = {
                                 "timestamp_str" : str(dtime),
                                 "timestamp" : str(int(dtime.timestamp())),

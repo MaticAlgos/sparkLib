@@ -118,7 +118,7 @@ class SparkLib():
 
     def placeorder(self, strategyName, orderType, productType,  token, qty, transType,limitPrice=0,
                    splitby = 0, triggerPrice = 0, forwardTest = False, operations = {"timeLimit": 0,"shouldExecute": False,"priceBuffer": 0},
-                   identifier = None):
+                   identifier = None, ticksize = 0.05):
         """
         Place the order
 
@@ -151,7 +151,8 @@ class SparkLib():
                  "triggerPrice": triggerPrice,
                  "ForwardTest": forwardTest,
                  "operations": operations,
-                 "identifier": identifier
+                 "identifier": identifier, 
+                 "ticksize" : ticksize
                  }
         url = "".join([self.BASEURL, self._routes['order.place']])
         return self._request("POST", url, body = body)
