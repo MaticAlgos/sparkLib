@@ -240,6 +240,14 @@ class redisData():
                                                           "oi" : "last"
                                                           }).dropna()
         return df
+    
+    def getMinCandle(self, token, dt):
+        r = self.__connect()
+        ts = int(dt.timestamp())
+        data = r.zrangebyscore(f"min:{token}", ts, ts)
+        if data == [] : 
+            return None
+        return json.loads(data[0].decode())
 
 
 class histDB():

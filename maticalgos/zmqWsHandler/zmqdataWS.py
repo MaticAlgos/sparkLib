@@ -13,6 +13,7 @@ import queue
 import redis 
 import json 
 import os 
+from dateutil import parser
 
 from ..sparkLib import SparkLib,OrderSocket
 from ..sparkLib.utility import dataws
@@ -96,6 +97,7 @@ class brokerWS():
         self.run = True
         self.sparkSession = sparkSession
         self.spwID = spwID
+        self.maxDelay = 3
 
     def runAction(self):
         while self.run :
@@ -119,13 +121,21 @@ class brokerWS():
 
     def onLtp(self, data):
         resp = {"type" : "DATA", "Identifier" : self.identifier, "data" : data, "message" : "", "Broker" : self.broker, "spwID" : self.spwID}
-        self.respQueue.put(resp)
+        if parser.parse(data['timestamp_str']) + datetime.timedelta(seconds=self.maxDelay) < datetime.datetime.now() :
+            # print(resp['Broker'], " DELAY")
+            # print(parser.parse(data['timestamp_str']) + datetime.timedelta(seconds=self.maxDelay), datetime.datetime.now())
+            pass
+        else: 
+            self.respQueue.put(resp)
 
     def onError(self, data, *args, **kwargs):
         resp = {"type" : "ERROR" , "Identifier" : self.identifier, "data" : data, "message" : f"Error - {self.identifier}", "Broker" : self.broker, 
                 "spwID" : self.spwID}
         self.respQueue.put(resp)
 
+    def onDelay(self):
+        pass
+    
     def onDepth(self, data):
         pass
     
@@ -146,7 +156,6 @@ class brokerWS():
             threading.Thread(target=self.socket.connect).start()
             threading.Thread(target=self.runAction).start()
 
-
 class TickHandler():
     tickQueue = queue.Queue()
     MINdata = {}
@@ -155,8 +164,10 @@ class TickHandler():
     premindata = {}
     prev_minval = 0
     minvalList = []
-
-    def __init__(self, ltpPubSub, respQueue, obj, logger, redisConf, _toRedis = False):
+    __delayTrack = {}
+    __maxDelay = 3
+    
+    def __init__(self, ltpPubSub, respQueue, obj, logger, redisConf, _toRedis = False, _priorityTicks = False):
         self.ltpPubSub = ltpPubSub
         self.respQueue = respQueue
         self.run = True
@@ -165,7 +176,12 @@ class TickHandler():
         self.__minValues = self.__minInterval(self.startTime, self.endTime)
         self.redisConf = redisConf
         self.__toRedis = _toRedis
-        
+        self._priorityTicks = _priorityTicks
+        self.priorityBroker = ""
+    
+    def _setPriority(self):
+        pass
+    
     def _zmq_config(self, host, port):
         context = zmq.Context()
         socket = context.socket(zmq.PUB)
@@ -201,12 +217,41 @@ class TickHandler():
         response = json.loads(socket.recv().decode())
         return response
 
+    def priorityCheck(self, recvMessage = None):
+        if self._priorityTicks : 
+            
+            if self.priorityBroker == "" : 
+                self.__delayTrack = {"delay" : {'till' : datetime.datetime.now(), "on" : False}, "wait" : {"till" : "", "on" : False}}
+                self.priorityBroker = self.obj._priorityList[0] if len(self.obj._priorityList) != 0 else ""
+            
+            else: 
+                if self.__delayTrack['wait']['on'] : 
+                    if datetime.datetime.now() > self.__delayTrack['wait']['till'] : 
+                        self.__delayTrack['wait']['on'] = False
+
+                else: 
+                    if recvMessage == None :
+                        if self.__delayTrack["delay"]["on"] : 
+                            if datetime.datetime.now() > self.__delayTrack["delay"]['till'] : 
+                                self.__delayTrack["delay"]["on"] = False
+                                brokers = self.obj._priorityList
+                                idx = brokers.index(self.priorityBroker)
+                                self.priorityBroker = brokers[idx + 1] if len(brokers) > idx+1 else brokers[0] 
+                                self.logger.critical(f"Shifting Broker to {self.priorityBroker}")
+                        else: 
+                            self.__delayTrack['delay']['on'] = True
+                            self.__delayTrack['delay']['till'] = datetime.datetime.now() + datetime.timedelta(seconds=self.__maxDelay)
+                    
+                    elif recvMessage != None : 
+                        if self.__delayTrack['delay']['on'] : 
+                            self.__delayTrack['delay']['on'] = False
+    
     def __checkQueue(self):
         while self.run: 
             try: 
                 qsize = self.respQueue.qsize()
                 for _ in range(qsize):
-                    message = self.respQueue.get(timeout=1)
+                    message = self.respQueue.get(timeout=0.1)
                     if message['type'] in ["CLOSE"] :
                         self.logger.critical(f"Connection Closed : {message}")
                         # Restarts the Data websocket as soon as it is closed. 
@@ -218,16 +263,26 @@ class TickHandler():
                         self.logger.critical(f"Error in Tick Data : {message}") 
 
                     elif message['type'] == "DATA" : 
-                        message['data'].update({"broker" : message['Broker']})
-                        self.tickQueue.put(message['data'])
-                        self.store_MIN(data=message['data'])
+                        if self._priorityTicks : 
+                            if message['Broker'] == self.priorityBroker : 
+                                self.priorityCheck(recvMessage=message)
+                                message['data'].update({"broker" : message['Broker']})
+                                self.tickQueue.put(message['data'])
+                                self.store_MIN(data=message['data'])
+                        else:
+                            message['data'].update({"broker" : message['Broker']})
+                            self.tickQueue.put(message['data'])
+                            self.store_MIN(data=message['data'])
                     
                     elif message['type'] == 'GENERAL' : 
                         self.logger.debug(f"General Update : {message}") 
                 time.sleep(0.01)
-
+                if qsize == 0 : 
+                    self.priorityCheck()
+                        
             except queue.Empty:
-                pass
+                self.priorityCheck()
+            
             except Exception as e : 
                 self.logger.exception(f"Error in Check Queue : {e}")
         
@@ -352,6 +407,7 @@ class ZmqDataWs():
     connections = {}
     wsConnections = {}
     respQueue = Queue(maxsize=5000)
+    _priorityList = []
         
     def __init__(self, accesstoken, 
                        zmqConnection = {"host" : "127.0.0.1", "port" : "8542"},
@@ -359,7 +415,8 @@ class ZmqDataWs():
                        ordPubSub = {"host" : "127.0.0.1", "port" : "8544"},
                        __orderUpdates = True,
                        redisConn = {"host" : "127.0.0.1", "port" : "6379"},
-                       _toRedis = True
+                       _toRedis = True,
+                       _priorityTicks = False
                        ) :
         
         logger = logging.getLogger(__name__)
@@ -387,9 +444,10 @@ class ZmqDataWs():
         self.ltpPubSub = ltpPubSub
         self._toRedis = _toRedis
         self.redisConn = redisConn
-
+        self._priorityTicks = _priorityTicks
         self.tickHandler = TickHandler(ltpPubSub=self.ltpPubSub, respQueue=self.respQueue, obj=self,
-                                       logger=self.logger, redisConf=self.redisConn,_toRedis=self._toRedis)
+                                       logger=self.logger, redisConf=self.redisConn,_toRedis=self._toRedis, 
+                                       _priorityTicks = _priorityTicks)
         self.tickHandler.StartProcess()
 
         self.__orderUpdates = __orderUpdates
@@ -433,7 +491,9 @@ class ZmqDataWs():
                                     "_broker" : acDict['Broker'],
                                     "_connType" : connType,
                                     "_seg" : acDict['segments']
-                                    }       
+                                    }     
+        if acDict['Broker'] not in self._priorityList:
+            self._priorityList.append(acDict['Broker'])  
         self.wsConnections[connId]["_function"] = brokerWS(accountData=acDict['accountData'],
                                                            sparkSession=self.sparkSession,
                                                            respQueue=self.respQueue,
@@ -567,34 +627,71 @@ class ZmqDataWs():
     @_middlewareLog
     def subscribe(self, payload):
         try: 
-            if not payload.get("AccountName") or not payload.get("tokens"): 
+            if payload.get("AccountName") == None or not payload.get("tokens"): 
                 return {"status" : False, "error" : True, "data" : [], "message" : "Invalid Payload."}
-            accountName = payload['AccountName']
-            spwIds = self.connections[accountName]['connections']
-            conntypeData = {k : self.wsConnections[k]['_connType'] for k in spwIds}
-            conntypes = ['ltp', 'depth']
-            
-            conntypeData = {k : [] for k in conntypes}
-            [conntypeData[self.wsConnections[spwid]['_connType']].append(spwid) for spwid in spwIds]
-            subs = []
-            for ctyp in conntypes : 
-                mapToks = []
-                for tk in payload['tokens'] : 
-                    for spwId in conntypeData[ctyp]:
-                        conn = self.wsConnections[spwId]
-                        if conn['_usedLimit'] < conn['_limit'] and tk not in mapToks and tk.split(":")[0] in conn['_seg'] : #and tk not in conn['tokens']: 
-                            conn['_usedLimit'] += 1 
-                            conn["_parseTokens"].append(tk)
-                            conn["tokens"].append(tk)
-                            mapToks.append(tk)
+            if payload['AccountName'] == "" : 
+                accountNames = self.connections.keys()
+                brokers = {}
+                conntypes = ['ltp', 'depth']
+                for ac in accountNames: 
+                    bro = self.connections[ac]['Broker']
+                    if bro not in brokers: 
+                        brokers[bro] = {}
+                    brokers[bro][ac] = {"spwid" : self.connections[ac]['connections'], "conntypeData" :  {k : self.wsConnections[k]['_connType'] for k in self.connections[ac]['connections']}} 
+                    
+                    brokers[bro][ac]["conntypeData"] = {k : [] for k in conntypes}
+                    [brokers[bro][ac]["conntypeData"][self.wsConnections[spwid]['_connType']].append(spwid) for spwid in brokers[bro][ac]['spwid']]
 
-            for spwId in spwIds : 
-                conn = self.wsConnections[spwId]
-                if conn["_parseTokens"] != [] : 
-                    conn["_queue"].put({"action" : "subscribe" , "tokens" : copy.deepcopy(conn["_parseTokens"])})
-                    subs.append({"connection" : spwId, "accountName" : accountName, "tokens" : copy.deepcopy(conn["_parseTokens"])})
-                conn["_parseTokens"] = [] 
-            return {"status" : True, "error" : False, "data" : subs, "message" : "Tokens subscribed"}
+                subs = []
+                for bro in brokers : 
+                    for ctyp in conntypes : 
+                        mapToks = []
+                        for tk in payload['tokens']: 
+                            for ac in brokers[bro]: 
+                                for spwId in brokers[bro][ac]['conntypeData'][ctyp] :
+                                    conn = self.wsConnections[spwId]
+                                    if conn['_usedLimit'] < conn['_limit'] and tk not in mapToks and tk.split(":")[0] in conn['_seg'] :
+                                        conn['_usedLimit'] += 1 
+                                        conn["_parseTokens"].append(tk)
+                                        conn["tokens"].append(tk)
+                                        mapToks.append(tk)
+                for bro in brokers : 
+                    for ac in brokers[bro] : 
+                        for spwId in brokers[bro][ac]["spwid"]:
+                            conn = self.wsConnections[spwId]
+                            if conn["_parseTokens"] != [] : 
+                                conn["_queue"].put({"action" : "subscribe" , "tokens" : copy.deepcopy(conn["_parseTokens"])})
+                                subs.append({"connection" : spwId, "accountName" : ac, "tokens" : copy.deepcopy(conn["_parseTokens"])})
+                            conn["_parseTokens"] = [] 
+                return {"status" : True, "error" : False, "data" : subs, "message" : "Tokens subscribed"}           
+                                
+            else: 
+                accountName = payload['AccountName']
+                spwIds = self.connections[accountName]['connections']
+                conntypeData = {k : self.wsConnections[k]['_connType'] for k in spwIds}
+                conntypes = ['ltp', 'depth']
+                
+                conntypeData = {k : [] for k in conntypes}
+                [conntypeData[self.wsConnections[spwid]['_connType']].append(spwid) for spwid in spwIds]
+                subs = []
+                for ctyp in conntypes : 
+                    mapToks = []
+                    for tk in payload['tokens'] : 
+                        for spwId in conntypeData[ctyp]:
+                            conn = self.wsConnections[spwId]
+                            if conn['_usedLimit'] < conn['_limit'] and tk not in mapToks and tk.split(":")[0] in conn['_seg'] : #and tk not in conn['tokens']: 
+                                conn['_usedLimit'] += 1 
+                                conn["_parseTokens"].append(tk)
+                                conn["tokens"].append(tk)
+                                mapToks.append(tk)
+
+                for spwId in spwIds : 
+                    conn = self.wsConnections[spwId]
+                    if conn["_parseTokens"] != [] : 
+                        conn["_queue"].put({"action" : "subscribe" , "tokens" : copy.deepcopy(conn["_parseTokens"])})
+                        subs.append({"connection" : spwId, "accountName" : accountName, "tokens" : copy.deepcopy(conn["_parseTokens"])})
+                    conn["_parseTokens"] = [] 
+                return {"status" : True, "error" : False, "data" : subs, "message" : "Tokens subscribed"}
         except Exception as e : 
             self.logger.exception("Error with token subscription : ")
             return {"status" : False , "error" : True, "data" : [], "message" : f"Error with token subscription : {str(e)}, Traceback : {traceback.format_exc()}"}
@@ -604,24 +701,46 @@ class ZmqDataWs():
         try: 
             if not payload.get("AccountName") or not payload.get("tokens"): 
                 return {"status" : False, "error" : True, "data" : [], "message" : "Invalid Payload."}
-            accountName = payload['AccountName']
-            spwIds = self.connections[accountName]['connections']
-            unsub = []
-            for tk in payload['tokens'] : 
-                for spwId in spwIds :
+            if payload['AccountName'] == "" : 
+                accountNames = self.connections.keys()
+                unsub = []
+                spwIds = []
+                [spwIds.extend(self.connections[ac]['connections']) for ac in accountNames]
+                print(spwIds)
+                for tk in payload['tokens']:
+                    for spwId in spwIds :
+                        conn = self.wsConnections[spwId]
+                        if tk in conn['tokens']: 
+                            conn['_unsubTokens'].append(tk)
+                            conn['_usedLimit'] -= 1
+                            conn['tokens'].remove(tk)
+                for spwId in spwIds : 
                     conn = self.wsConnections[spwId]
-                    if tk in conn['tokens']: 
-                        conn['_unsubTokens'].append(tk)
-                        conn['_usedLimit'] -= 1
-                        conn['tokens'].remove(tk)
-            for spwId in spwIds : 
-                conn = self.wsConnections[spwId]
-                if conn["_unsubTokens"] != [] : 
-                    conn["_queue"].put({"action" : "unsubscribe" , "tokens" : copy.deepcopy(conn["_unsubTokens"])})
-                    unsub.append({"connection" : spwId, "tokens" : copy.deepcopy(self.conn["_unsubTokens"])})
-                conn["_unsubTokens"] = []
+                    if conn["_unsubTokens"] != [] : 
+                        conn["_queue"].put({"action" : "unsubscribe" , "tokens" : copy.deepcopy(conn["_unsubTokens"])})
+                        unsub.append({"connection" : spwId, "tokens" : copy.deepcopy(self.conn["_unsubTokens"])})
+                    conn["_unsubTokens"] = []
+                return {"status" : True, "error" : False, "data" : unsub, "message" : "Tokens unsubscribed"}
             
-            return {"status" : True, "error" : False, "data" : unsub, "message" : "Tokens unsubscribed"}
+            else: 
+                accountName = payload['AccountName']
+                spwIds = self.connections[accountName]['connections']
+                unsub = []
+                for tk in payload['tokens'] : 
+                    for spwId in spwIds :
+                        conn = self.wsConnections[spwId]
+                        if tk in conn['tokens']: 
+                            conn['_unsubTokens'].append(tk)
+                            conn['_usedLimit'] -= 1
+                            conn['tokens'].remove(tk)
+                for spwId in spwIds : 
+                    conn = self.wsConnections[spwId]
+                    if conn["_unsubTokens"] != [] : 
+                        conn["_queue"].put({"action" : "unsubscribe" , "tokens" : copy.deepcopy(conn["_unsubTokens"])})
+                        unsub.append({"connection" : spwId, "tokens" : copy.deepcopy(self.conn["_unsubTokens"])})
+                    conn["_unsubTokens"] = []
+                return {"status" : True, "error" : False, "data" : unsub, "message" : "Tokens unsubscribed"}
+        
         except Exception as e : 
             self.logger.exception("Error with token unsubscription : ")
             return {"status" : False , "error" : True, "data" : [], "message" : f"Error with token unsubscription : {str(e)}, Traceback : {traceback.format_exc()}"}
