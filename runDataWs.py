@@ -1,7 +1,7 @@
 
 from maticalgos.sparkLib import SparkLib
 
-spk = SparkLib(apikeys="83e5dea1878f921")
+spk = SparkLib(apikeys="")
 
 from maticalgos.zmqWsHandler import ZmqDataWs
 

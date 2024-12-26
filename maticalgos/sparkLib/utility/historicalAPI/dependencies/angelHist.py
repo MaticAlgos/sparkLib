@@ -12,7 +12,8 @@ class angelAPI():
     MaxQuoteSymbolLimit = 50
     Historical_per_sec = 3
 
-    BASE_URL = "https://apiconnect.angelbroking.com/" #For V3
+    # BASE_URL = "https://apiconnect.angelbroking.com/" #For V3
+    BASE_URL = "https://apiconnect.angelone.in/"
     ENDPOINTS = { # For V3
         "getData" : "/rest/secure/angelbroking/historical/v1/getCandleData",
         "getQuotes" : "rest/secure/angelbroking/market/v1/quote"

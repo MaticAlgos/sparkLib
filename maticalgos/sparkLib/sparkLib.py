@@ -625,7 +625,7 @@ class SparkLib():
         Args:
             exch (str): Exchange name
         """
-        url = "".join([self.BASEURL, self._routes['isHoliday']]).format(exch = exch)
+        url = "".join([self.BASEURL, self._routes['holidays']]).format(exch = exch)
         return self._request("GET", url)
 
     def freezeqty(self,symbol):

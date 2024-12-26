@@ -7,6 +7,7 @@ import datetime
 import redis
 import pandas as pd
 import duckdb
+import queue
 
 class wsLib():
     def __init__(self, host = "localhost", ports = ['8542']):
@@ -74,11 +75,22 @@ class dataStream():
     tokens = []
     __allTicks = False
     __allMin = False
+    timeout = 2.5
+    MAX_RECONNECT = 10
+    RECONNECT_NO = 0
+    isReconnecting = False
+    __thRunner = {}
+    
     def __init__(self, host = "localhost", port = 8543):
         self.host = host
         self.port = port
         self.tickStream = self.__tickStream
         self.minStream = self.__minStream
+        self.lastUpdate = time.time()
+        self.lock = threading.Lock()
+        self.ReconQueue = queue.Queue()
+        self.is_recon = False
+        self.maxReconAlert = False
         
     def __tickStream(self, message):
         print(message)
@@ -86,54 +98,139 @@ class dataStream():
     def __minStream(self, message):
         print(message)
     
-    def __connect(self):
-        try: 
-            while self._run : 
-                try : 
+    # def __connect(self):
+    #     try: 
+    #         while self._run : 
+    #             try : 
+    #                 data = self.socket.recv(zmq.NOBLOCK) #flags = zmq.NOBLOCKS
+    #                 # print(data)
+    #                 # token, message = data.decode().split(" _&_ ")
+    #                 # if token in self.tokens : 
+    #                 #     dt = json.loads(message)
+    #                 #     self.__updateHandler(message = dt, isTick = True if "tick" in token else False)
                     
-                    data = self.socket.recv() #flags = zmq.NOBLOCKS
-                    # print(data)
-                    # token, message = data.decode().split(" _&_ ")
-                    # if token in self.tokens : 
-                    #     dt = json.loads(message)
-                    #     self.__updateHandler(message = dt, isTick = True if "tick" in token else False)
-                    
-                    # msgpack
-                    # message = msgpack.unpackb(data)
-                    # token = message['token']
-                    # if token in self.tokens : 
-                    #     self.__updateHandler(message = message, isTick = True if message['type'] == "tick" else False)
+    #                 # msgpack
+    #                 # message = msgpack.unpackb(data)
+    #                 # token = message['token']
+    #                 # if token in self.tokens : 
+    #                 #     self.__updateHandler(message = message, isTick = True if message['type'] == "tick" else False)
 
-                    data = ast.literal_eval(data.decode())
-                    for d in data : 
-                        token, message = d.split(" _&_ ")
-                        if token in self.tokens or ("tick" in token and self.__allTicks) or ("min" in token and self.__allMin) : 
-                            dt = json.loads(message)
-                            self.__updateHandler(message = dt, isTick = True if "tick" in token else False)
+    #                 data = ast.literal_eval(data.decode())
+    #                 for d in data : 
+    #                     token, message = d.split(" _&_ ")
+    #                     if token in self.tokens or ("tick" in token and self.__allTicks) or ("min" in token and self.__allMin) : 
+    #                         dt = json.loads(message)
+    #                         self.__updateHandler(message = dt, isTick = True if "tick" in token else False)
                 
+    #             except zmq.Again : 
+    #                 time.sleep(0.01)
+    #                 pass
+                
+    #             except zmq.ZMQError as e : 
+    #                 traceback.print_exc()
+    #                 print(e)
+    #                 self._run = False
+
+    #             except Exception as e:
+    #                 traceback.print_exc()
+    #                 print(f"Unexpected error: {e}")
+    #                 self._run = False
+                    
+    #     finally: pass
+    
+    def __connect(self, key = None):
+        try: 
+            self.context = zmq.Context().instance()
+            self.socket = self.context.socket(zmq.SUB)
+            self.socket.setsockopt(zmq.LINGER, 100)
+            self.socket.setsockopt_string(zmq.SUBSCRIBE, "")
+            self.socket.connect("tcp://{host}:{port}".format(host = self.host, port = self.port))
+            self.poller = zmq.Poller()
+            self.poller.register(self.socket, zmq.POLLIN)
+            key = int(time.time())
+            self.__thRunner[key] = True
+            print(self.__thRunner, key)
+            while  self.__thRunner[key] : 
+                try : 
+                    events = dict(self.poller.poll(timeout=100))
+                    if events : 
+                        self.lastUpdate = time.time()
+                        if self.socket in events : 
+                            data = self.socket.recv(zmq.NOBLOCK) #flags = zmq.NOBLOCKS
+                            data = ast.literal_eval(data.decode())
+                            for d in data : 
+                                token, message = d.split(" _&_ ")
+                                if token in self.tokens or ("tick" in token and self.__allTicks) or ("min" in token and self.__allMin) : 
+                                    dt = json.loads(message)
+                                    self.__updateHandler(message = dt, isTick = True if "tick" in token else False)
+                    else: 
+                        if time.time() - self.lastUpdate > self.timeout and self.tokens != [] and not self.isReconnecting : 
+                            if self.RECONNECT_NO < self.MAX_RECONNECT : 
+                                print("RECON", self.RECONNECT_NO)
+                                self.RECONNECT_NO += 1 
+                                with self.lock : 
+                                    self.__thRunner[key] = False
+                                    self.isReconnecting = True
+                            elif not self.maxReconAlert: 
+                                print(f"We've reached max reconnections of {self.MAX_RECONNECT}, There may be some issue with the data feed.") 
+                                self.maxReconAlert = True
                 except zmq.ZMQError as e : 
+                    traceback.print_exc()
                     print(e)
-                    self._run = False
+                    self.__thRunner[key] = False
 
                 except Exception as e:
+                    traceback.print_exc()
                     print(f"Unexpected error: {e}")
-                    self._run = False
+                    self.__thRunner[key] = False
                     
-        finally: pass
+            if not self.__thRunner[key] : 
+                if self.isReconnecting:
+                    self.ReconQueue.put(key)
         
-    def stop(self):
-        self._run = False
+        finally:
+            pass 
+    
+    def reconQueue(self):
+        while self._run:
+            data = self.ReconQueue.get()
+            self.stop(restart=True, key=data) 
+            time.sleep(5)
+            self.connect()
+            with self.lock:
+                self.isReconnecting = False
+                
+            time.sleep(0.1)
+    
+    def stop(self, restart = False, key = None):
+        if not restart: 
+            self._run = False
+            with self.lock:
+                for key in self.__thRunner.keys():
+                    self.__thRunner[key] = False
+            time.sleep(1)
+        with self.lock:
+            if key != None : 
+                self.__thRunner[key] = False  
+        self.poller.unregister(self.socket)
         self.socket.close()
         self.context.term()
-        
+
     def connect(self):
-        self.context = zmq.Context().instance()
-        self.socket = self.context.socket(zmq.SUB)
-        self.socket.setsockopt(zmq.LINGER, 100)
-        self.socket.setsockopt_string(zmq.SUBSCRIBE, "")
-        self.socket.connect("tcp://{host}:{port}".format(host = self.host, port = self.port))
-        th = threading.Thread(target = self.__connect)
-        th.start()
+        if not self.is_recon:
+            threading.Thread(target=self.reconQueue).start()
+            self.is_recon = True
+        th = threading.Thread(target = self.__connect, daemon=True).start()
+
+    def reconnect(self):
+        self.RECONNECT_NO+=1 
+        self.stop()
+        with self.lock:
+            while any(self.__thRunner.values()):
+                time.sleep(0.1)
+        self.connect()
+        with self.lock:
+            self.isReconnecting = False
 
     def subscribeAll(self, ticks = True):
         if ticks: 
