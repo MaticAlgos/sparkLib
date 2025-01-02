@@ -193,14 +193,17 @@ class dataStream():
     
     def reconQueue(self):
         while self._run:
-            data = self.ReconQueue.get()
-            self.stop(restart=True, key=data) 
-            time.sleep(5)
-            self.connect()
-            with self.lock:
-                self.isReconnecting = False
-                
-            time.sleep(0.1)
+            try: 
+                data = self.ReconQueue.get(timeout=1)
+                self.stop(restart=True, key=data) 
+                time.sleep(5)
+                self.connect()
+                with self.lock:
+                    self.isReconnecting = False
+                    
+                time.sleep(0.1)
+            except queue.Empty:
+                pass
     
     def stop(self, restart = False, key = None):
         if not restart: 
