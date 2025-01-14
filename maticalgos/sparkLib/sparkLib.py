@@ -27,6 +27,8 @@ class SparkLib():
         "sessionid.validate" : "/validate_session/{accountname}?sessionid={sessionid}",
         "authcode.validate" : "/validate_authcode/{broker}?auth_code={auth_code}",
         "authcode.generate" : "/login/{account}",
+        "account.enable" : "/account/enable?accountname={accountName}&broker={broker}",
+        "account.disable" : "/account/disable?accountname={accountName}",
         "strategy" : "/strategy",
         "strategy.create" : "/strategy",
         "strategy.modify" : "/strategy/{strategyname}",
@@ -36,7 +38,7 @@ class SparkLib():
         "modifylinkstrategy" : "/linkstrategy?st={st}&ac={ac}",
         "deleteLinkStrategy" : "/linkstrategy?st={st}&ac={ac}",
         "CancalAll_url" : "/CancelAll/{ctype}?stname={stname}&acname={acname}",
-        "SquareOff_url" : "/SquareOff/{ctype}?stname={stname}&acname={acname}",
+        "SquareOff_url" : "/SquareOff/{ctype}?",
         "orderbook" : "/orderbook/?acname={acname}&stname={stname}",
         "tradebook" : "/tradebook/?startDate={startDate}&endDate={endDate}&stname={stname}&acname={acname}",
         "netposition" : "/netposition/",
@@ -230,6 +232,15 @@ class SparkLib():
         url = "".join([self.BASEURL, self._routes['master.token'].format(body = st)])
         return self._request("GET", url)
 
+    def enableAccount(self, accountName, broker):
+        url = "".join([self.BASEURL, self._routes['account.enable'].format(accountName = accountName,
+                                                                           broker = broker)])
+        return self._request("POST", url)
+    
+    def disableAccount(self, accountName) : 
+        url = "".join([self.BASEURL, self._routes['account.disable'].format(accountName = accountName)])
+        return self._request("POST", url)
+    
     def getAllAccounts(self):
         """
         Get all accounts
@@ -438,7 +449,13 @@ class SparkLib():
             strategyName (str): Name of the strategy
             accountName (str): Name of the account
         """
-        url = "".join([self.BASEURL, self._routes['SquareOff_url'].format(ctype = ctype, stname = strategyName, acname = accountName)])
+        url = "".join([self.BASEURL, self._routes['SquareOff_url'].format(ctype = ctype)])
+        toadd = []
+        if not not strategyName : 
+            toadd.append(f"stname={strategyName}")
+        if not not accountName : 
+            toadd.append(f"acname={accountName}")
+        url = url + "&".join(toadd)
         return self._request("GET", url)
 
     def orderbook(self,accountName, strategyName, withorders=False,strefid = None, reftag = None, today = True):

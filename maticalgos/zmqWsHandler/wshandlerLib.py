@@ -214,8 +214,11 @@ class dataStream():
             time.sleep(1)
         with self.lock:
             if key != None : 
-                self.__thRunner[key] = False  
-        self.poller.unregister(self.socket)
+                self.__thRunner[key] = False
+        try:   
+            self.poller.unregister(self.socket)
+        except:
+            pass
         self.socket.close()
         self.context.term()
 
