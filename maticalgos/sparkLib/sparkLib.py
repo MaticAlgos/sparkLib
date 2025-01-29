@@ -39,7 +39,7 @@ class SparkLib():
         "deleteLinkStrategy" : "/linkstrategy?st={st}&ac={ac}",
         "CancalAll_url" : "/CancelAll/{ctype}?stname={stname}&acname={acname}",
         "SquareOff_url" : "/SquareOff/{ctype}?",
-        "orderbook" : "/orderbook/?acname={acname}&stname={stname}",
+        "orderbook" : "/orderbook/?withorders={withorders}&today={today}",
         "tradebook" : "/tradebook/?startDate={startDate}&endDate={endDate}&stname={stname}&acname={acname}",
         "netposition" : "/netposition/",
         "pushtrades" : "/pushtrades/",
@@ -458,7 +458,8 @@ class SparkLib():
         url = url + "&".join(toadd)
         return self._request("GET", url)
 
-    def orderbook(self,accountName, strategyName, withorders=False,strefid = None, reftag = None, today = True):
+    def orderbook(self,accountName = None, strategyName = None, withorders=False,
+                  strefid = None, reftag = None, today = True):
         """
         Get the order book
 
@@ -469,12 +470,14 @@ class SparkLib():
             reftag (str): Reference tag of the order
             withorders (bool): With orders
         """
-        url = "".join([self.BASEURL, self._routes['orderbook'].format(acname = accountName, stname = strategyName)])
+        today = "true" if today else "false"
+        withorders = "true" if withorders else "false"
+        url = "".join([self.BASEURL, self._routes['orderbook'].format(withorders = withorders, 
+                                                                      today = today)])
+        if accountName: url=url+ "&acname=" + accountName
+        if strategyName: url=url+ "&stname=" + strategyName
         if strefid : url = url + "&strefid=" + strefid
         if reftag : url = url + "&reftag=" + reftag
-        if withorders : url = url + "&withorders=" + withorders
-        if today : url = url + "&today=" + today 
-        if not today : url = url + "&today" + False
         return self._request("GET", url)
 
     def tradebook(self,startDate,endDate,strategyName,accountName):

@@ -164,7 +164,8 @@ class dataStream():
                                     dt = json.loads(message)
                                     self.__updateHandler(message = dt, isTick = True if "tick" in token else False)
                     else: 
-                        if time.time() - self.lastUpdate > self.timeout and self.tokens != [] and not self.isReconnecting : 
+                        if time.time() - self.lastUpdate > self.timeout and self.tokens != [] and not self.isReconnecting \
+                        and datetime.datetime.now().time >= datetime.time(9,15) : 
                             if self.RECONNECT_NO < self.MAX_RECONNECT : 
                                 print("RECON", self.RECONNECT_NO)
                                 self.RECONNECT_NO += 1 
