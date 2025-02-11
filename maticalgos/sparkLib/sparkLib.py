@@ -56,7 +56,8 @@ class SparkLib():
         "freezeqty" : "/master-freezeqty?symbol={symbol}",
         "tokenMappings" : "/token-mappings?broker={broker}",
         "contractMaster" : "/contract-master/",
-        "holidays" : "/holidays"
+        "holidays" : "/holidays",
+        "Parameters" : "/strategyparams/{stname}", 
     }
     _timeout = 15
 
@@ -669,6 +670,18 @@ class SparkLib():
     def getBrokerTokens(self, tokens:list, broker:str):
         url = "".join([self.BASEURL,self._routes['tokenMappings']]).format(broker=broker)
         return self._request("POST", url, body={"tokens" : tokens})
+    
+    def addParams(self, strategyName, params):
+        url = "".join([self.BASEURL,self._routes['Parameters']]).format(stname=strategyName)
+        return self._request("POST", url, body=params)
+
+    def getParams(self, strategyName):
+        url = "".join([self.BASEURL,self._routes['Parameters']]).format(stname=strategyName)
+        return self._request("GET", url)
+    
+    def modifyParams(self, strategyName, params):
+        url = "".join([self.BASEURL,self._routes['Parameters']]).format(stname=strategyName)
+        return self._request("PUT", url, body=params)
 
     def _request(self, method, url, body = None, data = None, is_header = True, timeout = _timeout):
         """

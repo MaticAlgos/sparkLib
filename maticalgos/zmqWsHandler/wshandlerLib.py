@@ -164,8 +164,8 @@ class dataStream():
                                     dt = json.loads(message)
                                     self.__updateHandler(message = dt, isTick = True if "tick" in token else False)
                     else: 
-                        if time.time() - self.lastUpdate > self.timeout and self.tokens != [] and not self.isReconnecting \
-                        and datetime.datetime.now().time >= datetime.time(9,15) : 
+                        if (time.time() - self.lastUpdate > self.timeout and self.tokens != [] and not self.isReconnecting \
+                        and datetime.datetime.now().time >= datetime.time(9,15)) : 
                             if self.RECONNECT_NO < self.MAX_RECONNECT : 
                                 print("RECON", self.RECONNECT_NO)
                                 self.RECONNECT_NO += 1 
@@ -371,6 +371,7 @@ class histDB():
         df =  conn.execute(f"""SELECT {self.columns} FROM dbtable WHERE token='{token}' AND datetime >= '{str(startTime)}' AND datetime <= '{str(endTime)}' ORDER BY datetime ASC""").df()
         df['datetime'] = pd.to_datetime(df['datetime'], format="%Y-%m-%d %H:%M:%S")
         df = df.set_index('datetime')
+        if df.empty: return df
         if timeframe != 1 : 
             df = df.resample(f'{str(timeframe)}min', origin = datetime.datetime.combine(df.iloc[0].name.date(), origin)).agg({"open" : "first", 
                                                           "high" : "max", 

@@ -4,3 +4,4 @@ maticalgos_spark.egg-info/
 /MANIFEST.in
 /zmqdataws.log
 build/
+testSpark.ipynb
