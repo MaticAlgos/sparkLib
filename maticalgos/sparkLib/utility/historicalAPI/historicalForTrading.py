@@ -161,14 +161,19 @@ class buildHist():
             yield data[i:i + batch]
 
     def pushDuckDB(self, data, batch=10000):
-        conn = self._conn()
-        # for chunk in self.chunks(data, batch):
-            # data = pd.DataFrame(chunk)
-            # conn.execute("""INSERT INTO dbtable SELECT * FROM data""")
-        data = pd.DataFrame(data)
-        conn.execute("""INSERT INTO dbtable SELECT * FROM data""")
-        conn.commit()
-        conn.close()
+        try: 
+            conn = self._conn()
+            # for chunk in self.chunks(data, batch):
+                # data = pd.DataFrame(chunk)
+                # conn.execute("""INSERT INTO dbtable SELECT * FROM data""")
+            data = pd.DataFrame(data)
+            if not data.empty: 
+                conn.execute("""INSERT INTO dbtable SELECT * FROM data""")
+                conn.commit()
+                conn.close()
+        except Exception as e: 
+            print(f"Error {e} while pushing data to duck db ")
+            traceback.print_exc()
 
     def getConf(self):
         conn = self._conn()
@@ -182,7 +187,7 @@ class buildHist():
         endDt = str(today - datetime.timedelta(days=maxDays))
         conn.execute(f"""DELETE FROM dbtable WHERE datetime < '{endDt}'""")
         conn.commit()
-        conn.execute(f"""DELETE FROM dbtable WHERE expiry < '{today}' and expiry > '1900-01-01 00:00:00'""")
+        # conn.execute(f"""DELETE FROM dbtable WHERE expiry < '{today}' and expiry > '1900-01-01 00:00:00'""")
         conn.commit()
         conn.close()
 

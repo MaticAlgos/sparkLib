@@ -57,6 +57,7 @@ class SparkLib():
         "tokenMappings" : "/token-mappings?broker={broker}",
         "contractMaster" : "/contract-master/",
         "holidays" : "/holidays",
+        "prevholidays" : "/prevholidays",
         "Parameters" : "/strategyparams/{stname}", 
     }
     _timeout = 15
@@ -647,6 +648,16 @@ class SparkLib():
             exch (str): Exchange name
         """
         url = "".join([self.BASEURL, self._routes['holidays']]).format(exch = exch)
+        return self._request("GET", url)
+    
+    def prevholidays(self,exch=None):
+        """
+        Get Holiday Dates list
+
+        Args:
+            exch (str): Exchange name
+        """
+        url = "".join([self.BASEURL, self._routes['prevholidays']]).format(exch = exch)
         return self._request("GET", url)
 
     def freezeqty(self,symbol):

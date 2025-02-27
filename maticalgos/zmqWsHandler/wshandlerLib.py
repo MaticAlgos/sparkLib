@@ -353,7 +353,6 @@ class redisData():
             return None
         return json.loads(data[0].decode())
 
-
 class histDB():
     def __init__(self, filename, path:str="./"):
         self.filename=filename
@@ -361,7 +360,11 @@ class histDB():
         self.startTime= datetime.datetime.now().replace(hour=0,minute=0,second=0,microsecond=0)-datetime.timedelta(days=1)
         self.endTime = datetime.datetime.now().replace(hour=23,minute=0,second=0,microsecond=0)-datetime.timedelta(days=1)
         self.columns = "token,datetime,open,high,low,close,volume,oi"
+        
     def __connect(self):
+        return duckdb.connect(r"{path}/{filename}.db".format(path=self.path,filename=self.filename), read_only=True)
+
+    def _connect(self):
         return duckdb.connect(r"{path}/{filename}.db".format(path=self.path,filename=self.filename), read_only=True)
 
     def fetchData(self, token, startTime:datetime=None, endTime:datetime=None, timeframe:int=1, origin = datetime.time(9,15)):
